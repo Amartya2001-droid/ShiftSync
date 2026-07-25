@@ -1,0 +1,19 @@
+name: ShiftSync CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  project-validation:
+    name: Project validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate architecture, tests, and documentation
+        run: bash scripts/validate-project.sh
