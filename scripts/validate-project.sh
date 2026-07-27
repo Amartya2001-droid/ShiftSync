@@ -8,8 +8,11 @@ required_files=(
   "app/src/main/AndroidManifest.xml"
   "app/src/main/java/com/shiftsync/app/MainActivity.kt"
   "app/src/main/java/com/shiftsync/app/domain/usecase/ValidateTradeEligibilityUseCase.kt"
+  "app/src/main/java/com/shiftsync/app/domain/usecase/CalculateWeeklyScheduleMetricsUseCase.kt"
   "app/src/test/java/com/shiftsync/app/domain/usecase/ValidateTradeEligibilityUseCaseTest.kt"
+  "app/src/test/java/com/shiftsync/app/domain/usecase/CalculateWeeklyScheduleMetricsUseCaseTest.kt"
   "README.md"
+  "docs/demo-checklist.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -23,6 +26,7 @@ grep -q "Clean Architecture" README.md
 grep -q "Jetpack Compose" README.md
 grep -q "AI Workflow Transparency" README.md
 grep -q "Testing" README.md
+grep -q "ShiftSync Demo Checklist" docs/demo-checklist.md
 
 if grep -R "TODO\\|FIXME" app/src README.md; then
   echo "Found unfinished TODO/FIXME markers."

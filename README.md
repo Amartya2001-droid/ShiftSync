@@ -48,6 +48,7 @@ Included tests:
 
 - `ValidateTradeEligibilityUseCaseTest`: overlapping shifts, max-hour violations, and valid claims.
 - `RequestShiftSwapUseCaseTest`: smart-note path and open-board posting.
+- `CalculateWeeklyScheduleMetricsUseCaseTest`: weekly hours, dinner shift count, and estimated earnings.
 - `SwapRequestDialogTest`: Compose dialog opens, accepts input, and submits the smart-note action.
 
 Run locally from the project root after installing Android Gradle tooling:
@@ -62,3 +63,5 @@ If a Gradle wrapper has not been generated yet, open the project in Android Stud
 ## Demo Entry Point
 
 `MainActivity` wires an in-memory repository with seeded restaurant data so the app launches directly into the usable ShiftSync experience.
+
+For a reviewer-facing walkthrough, use [docs/demo-checklist.md](docs/demo-checklist.md).
