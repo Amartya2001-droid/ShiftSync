@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.shiftsync.app.domain.model.Shift
 import com.shiftsync.app.presentation.ScheduleUiState
 import com.shiftsync.app.presentation.calendar.StatusBadge
+import com.shiftsync.app.presentation.formatting.RoleFormatter
 import com.shiftsync.app.presentation.formatting.ShiftTimeFormatter
 
 @Composable
@@ -39,7 +40,7 @@ fun MarketplaceScreen(
 private fun OpenShiftCard(shift: Shift, onClaimShift: () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("${shift.role.name} - ${shift.section}", style = MaterialTheme.typography.titleMedium)
+            Text("${RoleFormatter.label(shift.role)} - ${shift.section}", style = MaterialTheme.typography.titleMedium)
             Text(ShiftTimeFormatter.fullRange(shift))
             StatusBadge(status = shift.status)
             Button(onClick = onClaimShift) {

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.shiftsync.app.domain.model.Shift
 import com.shiftsync.app.domain.model.ShiftStatus
 import com.shiftsync.app.presentation.ScheduleUiState
+import com.shiftsync.app.presentation.formatting.RoleFormatter
 import com.shiftsync.app.presentation.formatting.ShiftTimeFormatter
 
 @Composable
@@ -67,7 +68,7 @@ fun ShiftCard(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
-                    Text(shift.role.name, style = MaterialTheme.typography.titleMedium)
+                    Text(RoleFormatter.label(shift.role), style = MaterialTheme.typography.titleMedium)
                     Text("${shift.section} section", style = MaterialTheme.typography.bodyMedium)
                 }
                 StatusBadge(status = shift.status)

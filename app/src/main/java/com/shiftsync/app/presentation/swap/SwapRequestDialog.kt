@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.shiftsync.app.domain.model.Employee
 import com.shiftsync.app.domain.model.Shift
+import com.shiftsync.app.presentation.formatting.RoleFormatter
 
 @Composable
 fun SwapRequestDialog(
@@ -31,7 +32,7 @@ fun SwapRequestDialog(
         title = { Text("Request Swap") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("${shift.role.name} in ${shift.section}")
+                Text("${RoleFormatter.label(shift.role)} in ${shift.section}")
                 OutlinedTextField(
                     modifier = Modifier.fillMaxWidth(),
                     value = reason,
