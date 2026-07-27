@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.shiftsync.app.domain.model.Shift
 import com.shiftsync.app.presentation.ScheduleUiState
 import com.shiftsync.app.presentation.calendar.StatusBadge
+import com.shiftsync.app.presentation.common.EmptyState
 import com.shiftsync.app.presentation.formatting.RoleFormatter
 import com.shiftsync.app.presentation.formatting.ShiftTimeFormatter
 
@@ -28,9 +29,16 @@ fun MarketplaceScreen(
 ) {
     Column(modifier = modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Trade Marketplace", style = MaterialTheme.typography.headlineMedium)
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(state.openShifts, key = { it.id }) { shift ->
-                OpenShiftCard(shift = shift, onClaimShift = { onClaimShift(shift) })
+        if (state.openShifts.isEmpty()) {
+            EmptyState(
+                title = "No open shifts",
+                message = "Open shifts from teammates will appear here when they are posted."
+            )
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(state.openShifts, key = { it.id }) { shift ->
+                    OpenShiftCard(shift = shift, onClaimShift = { onClaimShift(shift) })
+                }
             }
         }
     }

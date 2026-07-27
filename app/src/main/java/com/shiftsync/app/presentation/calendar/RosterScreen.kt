@@ -24,6 +24,7 @@ import com.shiftsync.app.domain.model.Shift
 import com.shiftsync.app.domain.model.ShiftStatus
 import com.shiftsync.app.domain.usecase.CalculateRosterStatusSummaryUseCase
 import com.shiftsync.app.presentation.ScheduleUiState
+import com.shiftsync.app.presentation.common.EmptyState
 import com.shiftsync.app.presentation.formatting.RoleFormatter
 import com.shiftsync.app.presentation.formatting.ShiftTimeFormatter
 
@@ -38,9 +39,16 @@ fun RosterScreen(
         Text("Weekly Roster", style = MaterialTheme.typography.headlineMedium)
         RosterSummary(summary.confirmed, summary.pendingTrade, summary.upForGrabs)
         WeekStrip(shifts = state.myShifts)
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(state.myShifts, key = { it.id }) { shift ->
-                ShiftCard(shift = shift, onRequestSwap = { onRequestSwap(shift) })
+        if (state.myShifts.isEmpty()) {
+            EmptyState(
+                title = "No shifts scheduled",
+                message = "Newly published shifts will appear here as soon as the roster syncs."
+            )
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(state.myShifts, key = { it.id }) { shift ->
+                    ShiftCard(shift = shift, onRequestSwap = { onRequestSwap(shift) })
+                }
             }
         }
     }
