@@ -8,6 +8,7 @@ import com.shiftsync.app.domain.model.TradeRequest
 import com.shiftsync.app.domain.model.TradeRequestStatus
 import com.shiftsync.app.domain.repository.ScheduleRepository
 import com.shiftsync.app.domain.usecase.CalculateWeeklyScheduleMetricsUseCase
+import com.shiftsync.app.domain.usecase.DraftSwapNoteUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -18,6 +19,7 @@ class InMemoryScheduleRepository : ScheduleRepository {
     private val shifts = MutableStateFlow(SeedData.shifts())
     private val employees = MutableStateFlow(SeedData.employees)
     private val calculateWeeklyScheduleMetrics = CalculateWeeklyScheduleMetricsUseCase()
+    private val draftSwapNote = DraftSwapNoteUseCase()
 
     override fun observeMyShifts(employeeId: String): Flow<List<Shift>> {
         return shifts.map { items -> items.filter { it.employeeId == employeeId }.sortedBy { it.startsAt } }
@@ -49,8 +51,7 @@ class InMemoryScheduleRepository : ScheduleRepository {
     }
 
     override suspend fun generateSwapNote(reason: String): String {
-        val cleanedReason = reason.trim().ifBlank { "a scheduling conflict" }
-        return "Hi team, could someone please take this shift? I have $cleanedReason and would really appreciate the coverage."
+        return draftSwapNote(reason)
     }
 
     override suspend fun generateScheduleInsight(employeeId: String): ScheduleInsight {

@@ -10,6 +10,7 @@ import com.shiftsync.app.domain.model.TradeRequest
 import com.shiftsync.app.domain.model.TradeRequestStatus
 import com.shiftsync.app.domain.repository.ScheduleRepository
 import com.shiftsync.app.domain.usecase.CalculateWeeklyScheduleMetricsUseCase
+import com.shiftsync.app.domain.usecase.DraftSwapNoteUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant
@@ -19,6 +20,7 @@ class OfflineFirstScheduleRepository(
     private val dao: ScheduleDao
 ) : ScheduleRepository {
     private val calculateWeeklyScheduleMetrics = CalculateWeeklyScheduleMetricsUseCase()
+    private val draftSwapNote = DraftSwapNoteUseCase()
 
     override fun observeMyShifts(employeeId: String): Flow<List<Shift>> {
         return dao.observeShiftsForEmployee(employeeId).map { entities -> entities.map { it.toDomain() } }
@@ -58,8 +60,7 @@ class OfflineFirstScheduleRepository(
     }
 
     override suspend fun generateSwapNote(reason: String): String {
-        val cleanedReason = reason.trim().ifBlank { "a scheduling conflict" }
-        return "Hi team, could someone please cover this shift? I am requesting the swap because of $cleanedReason. Thanks for considering it."
+        return draftSwapNote(reason)
     }
 
     override suspend fun generateScheduleInsight(employeeId: String): ScheduleInsight {
