@@ -32,7 +32,7 @@ class ValidateTradeEligibilityUseCaseTest {
     @Test
     fun `returns ineligible when candidate exceeds max weekly hours`() = runTest {
         val existing = shift("existing", startHour = 8, endHour = 16)
-        val candidate = shift("candidate", startHour = 17, endHour = 23, employeeId = null)
+        val candidate = shift("candidate", startHour = 0, endHour = 6, employeeId = null, dayOffset = 1)
         coEvery { repository.shiftsForEmployee("emp-1") } returns listOf(existing)
 
         val result = useCase("emp-1", candidate)
@@ -44,9 +44,21 @@ class ValidateTradeEligibilityUseCaseTest {
     }
 
     @Test
+    fun `returns ineligible when candidate leaves too little rest`() = runTest {
+        val existing = shift("existing", startHour = 10, endHour = 16)
+        val candidate = shift("candidate", startHour = 22, endHour = 23, employeeId = null)
+        coEvery { repository.shiftsForEmployee("emp-1") } returns listOf(existing)
+
+        val result = useCase("emp-1", candidate)
+
+        assertTrue(result is EligibilityResult.Ineligible)
+        assertTrue((result as EligibilityResult.Ineligible).reason.contains("less than 8 hours of rest"))
+    }
+
+    @Test
     fun `returns eligible when there is no overlap and weekly hours are valid`() = runTest {
         val existing = shift("existing", startHour = 8, endHour = 12)
-        val candidate = shift("candidate", startHour = 13, endHour = 17, employeeId = null)
+        val candidate = shift("candidate", startHour = 21, endHour = 23, employeeId = null)
         coEvery { repository.shiftsForEmployee("emp-1") } returns listOf(existing)
 
         val result = useCase("emp-1", candidate)
@@ -58,9 +70,10 @@ class ValidateTradeEligibilityUseCaseTest {
         id: String,
         startHour: Int,
         endHour: Int,
-        employeeId: String? = "emp-1"
+        employeeId: String? = "emp-1",
+        dayOffset: Long = 0
     ): Shift {
-        val day = LocalDateTime.of(2026, 7, 20, 0, 0)
+        val day = LocalDateTime.of(2026, 7, 20, 0, 0).plusDays(dayOffset)
         return Shift(
             id = id,
             employeeId = employeeId,
