@@ -7,6 +7,7 @@ import com.shiftsync.app.domain.model.ShiftStatus
 import com.shiftsync.app.domain.model.TradeRequest
 import com.shiftsync.app.domain.model.TradeRequestStatus
 import com.shiftsync.app.domain.repository.ScheduleRepository
+import com.shiftsync.app.domain.usecase.CalculateWeeklyScheduleMetricsUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -16,6 +17,7 @@ import java.util.UUID
 class InMemoryScheduleRepository : ScheduleRepository {
     private val shifts = MutableStateFlow(SeedData.shifts())
     private val employees = MutableStateFlow(SeedData.employees)
+    private val calculateWeeklyScheduleMetrics = CalculateWeeklyScheduleMetricsUseCase()
 
     override fun observeMyShifts(employeeId: String): Flow<List<Shift>> {
         return shifts.map { items -> items.filter { it.employeeId == employeeId }.sortedBy { it.startsAt } }
@@ -54,14 +56,12 @@ class InMemoryScheduleRepository : ScheduleRepository {
     override suspend fun generateScheduleInsight(employeeId: String): ScheduleInsight {
         val employee = employees.value.first { it.id == employeeId }
         val myShifts = shiftsForEmployee(employeeId)
-        val totalHours = myShifts.sumOf { it.hours }
-        val earnings = (totalHours * employee.hourlyRateCents).toInt()
-        val dinnerShifts = myShifts.count { it.startsAt.hour >= 16 }
+        val metrics = calculateWeeklyScheduleMetrics(myShifts, employee.hourlyRateCents)
         return ScheduleInsight(
-            totalHours = totalHours,
-            estimatedEarningsCents = earnings,
+            totalHours = metrics.totalHours,
+            estimatedEarningsCents = metrics.estimatedEarningsCents,
             coverageGaps = listOf("Thursday lunch has one open Server shift", "Saturday close needs backup Host coverage"),
-            summary = "${employee.name} has ${"%.1f".format(totalHours)} hours, $dinnerShifts dinner shifts, and about ${formatCents(earnings)} in base wages."
+            summary = "${employee.name} has ${"%.1f".format(metrics.totalHours)} hours, ${metrics.dinnerShiftCount} dinner shifts, and about ${formatCents(metrics.estimatedEarningsCents)} in base wages."
         )
     }
 

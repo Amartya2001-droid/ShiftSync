@@ -9,6 +9,7 @@ import com.shiftsync.app.domain.model.ShiftStatus
 import com.shiftsync.app.domain.model.TradeRequest
 import com.shiftsync.app.domain.model.TradeRequestStatus
 import com.shiftsync.app.domain.repository.ScheduleRepository
+import com.shiftsync.app.domain.usecase.CalculateWeeklyScheduleMetricsUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant
@@ -17,6 +18,8 @@ import java.util.UUID
 class OfflineFirstScheduleRepository(
     private val dao: ScheduleDao
 ) : ScheduleRepository {
+    private val calculateWeeklyScheduleMetrics = CalculateWeeklyScheduleMetricsUseCase()
+
     override fun observeMyShifts(employeeId: String): Flow<List<Shift>> {
         return dao.observeShiftsForEmployee(employeeId).map { entities -> entities.map { it.toDomain() } }
     }
@@ -62,8 +65,7 @@ class OfflineFirstScheduleRepository(
     override suspend fun generateScheduleInsight(employeeId: String): ScheduleInsight {
         val employee = SeedData.employees.first { it.id == employeeId }
         val shifts = shiftsForEmployee(employeeId)
-        val totalHours = shifts.sumOf { it.hours }
-        val earnings = (totalHours * employee.hourlyRateCents).toInt()
+        val metrics = calculateWeeklyScheduleMetrics(shifts, employee.hourlyRateCents)
         val gaps = shifts
             .groupBy { it.role }
             .filterValues { roleShifts -> roleShifts.sumOf { it.hours } < 10.0 }
@@ -71,10 +73,10 @@ class OfflineFirstScheduleRepository(
             .map { "Light ${it.name} coverage this week" }
 
         return ScheduleInsight(
-            totalHours = totalHours,
-            estimatedEarningsCents = earnings,
+            totalHours = metrics.totalHours,
+            estimatedEarningsCents = metrics.estimatedEarningsCents,
             coverageGaps = gaps,
-            summary = "You are scheduled for ${"%.1f".format(totalHours)} hours with an estimated ${formatCents(earnings)} before tips."
+            summary = "You are scheduled for ${"%.1f".format(metrics.totalHours)} hours with an estimated ${formatCents(metrics.estimatedEarningsCents)} before tips."
         )
     }
 
