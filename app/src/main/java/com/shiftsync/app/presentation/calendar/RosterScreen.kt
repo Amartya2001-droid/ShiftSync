@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.shiftsync.app.domain.model.Shift
 import com.shiftsync.app.domain.model.ShiftStatus
 import com.shiftsync.app.presentation.ScheduleUiState
-import java.time.format.DateTimeFormatter
+import com.shiftsync.app.presentation.formatting.ShiftTimeFormatter
 
 @Composable
 fun RosterScreen(
@@ -45,10 +45,10 @@ fun RosterScreen(
 @Composable
 private fun WeekStrip(shifts: List<Shift>) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(shifts.map { it.startsAt.toLocalDate() }.distinct()) { date ->
+        items(shifts.distinctBy { it.startsAt.toLocalDate() }) { shift ->
             AssistChip(
                 onClick = {},
-                label = { Text(date.format(DateTimeFormatter.ofPattern("EEE d"))) }
+                label = { Text(ShiftTimeFormatter.dayChipLabel(shift)) }
             )
         }
     }
@@ -72,10 +72,7 @@ fun ShiftCard(
                 }
                 StatusBadge(status = shift.status)
             }
-            Text(
-                "${shift.startsAt.format(DateTimeFormatter.ofPattern("EEE, MMM d"))}  " +
-                    "${shift.startsAt.format(DateTimeFormatter.ofPattern("h:mm a"))} - ${shift.endsAt.format(DateTimeFormatter.ofPattern("h:mm a"))}"
-            )
+            Text(ShiftTimeFormatter.fullRange(shift))
             Button(onClick = onRequestSwap) {
                 Text("Request Swap")
             }
