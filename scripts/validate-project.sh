@@ -12,6 +12,8 @@ required_files=(
   "app/src/test/java/com/shiftsync/app/domain/usecase/ValidateTradeEligibilityUseCaseTest.kt"
   "app/src/test/java/com/shiftsync/app/domain/usecase/CalculateWeeklyScheduleMetricsUseCaseTest.kt"
   "README.md"
+  "CONTRIBUTING.md"
+  ".github/pull_request_template.md"
   "docs/demo-checklist.md"
   "docs/adr/0001-offline-first-scheduling.md"
 )
@@ -27,6 +29,8 @@ grep -q "Clean Architecture" README.md
 grep -q "Jetpack Compose" README.md
 grep -q "AI Workflow Transparency" README.md
 grep -q "Testing" README.md
+grep -q "Contributing to ShiftSync" CONTRIBUTING.md
+grep -q "AI Usage" .github/pull_request_template.md
 grep -q "ShiftSync Demo Checklist" docs/demo-checklist.md
 grep -q "Offline-First Scheduling Boundary" docs/adr/0001-offline-first-scheduling.md
 
