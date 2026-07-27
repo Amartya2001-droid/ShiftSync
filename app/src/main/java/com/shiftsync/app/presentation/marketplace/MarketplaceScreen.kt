@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.shiftsync.app.domain.model.Shift
+import com.shiftsync.app.domain.usecase.PrioritizeOpenShiftMarketplaceUseCase
 import com.shiftsync.app.presentation.ScheduleUiState
 import com.shiftsync.app.presentation.calendar.StatusBadge
 import com.shiftsync.app.presentation.common.EmptyState
@@ -27,16 +28,17 @@ fun MarketplaceScreen(
     onClaimShift: (Shift) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val prioritizedShifts = PrioritizeOpenShiftMarketplaceUseCase()(state.openShifts)
     Column(modifier = modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Trade Marketplace", style = MaterialTheme.typography.headlineMedium)
-        if (state.openShifts.isEmpty()) {
+        if (prioritizedShifts.isEmpty()) {
             EmptyState(
                 title = "No open shifts",
                 message = "Open shifts from teammates will appear here when they are posted."
             )
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(state.openShifts, key = { it.id }) { shift ->
+                items(prioritizedShifts, key = { it.id }) { shift ->
                     OpenShiftCard(shift = shift, onClaimShift = { onClaimShift(shift) })
                 }
             }
