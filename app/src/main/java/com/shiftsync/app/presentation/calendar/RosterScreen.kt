@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.shiftsync.app.domain.model.Shift
 import com.shiftsync.app.domain.model.ShiftStatus
+import com.shiftsync.app.domain.usecase.CalculateRosterStatusSummaryUseCase
 import com.shiftsync.app.presentation.ScheduleUiState
 import com.shiftsync.app.presentation.formatting.RoleFormatter
 import com.shiftsync.app.presentation.formatting.ShiftTimeFormatter
@@ -32,13 +33,30 @@ fun RosterScreen(
     onRequestSwap: (Shift) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val summary = CalculateRosterStatusSummaryUseCase()(state.myShifts)
     Column(modifier = modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Weekly Roster", style = MaterialTheme.typography.headlineMedium)
+        RosterSummary(summary.confirmed, summary.pendingTrade, summary.upForGrabs)
         WeekStrip(shifts = state.myShifts)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(state.myShifts, key = { it.id }) { shift ->
                 ShiftCard(shift = shift, onRequestSwap = { onRequestSwap(shift) })
             }
+        }
+    }
+}
+
+@Composable
+private fun RosterSummary(confirmed: Int, pendingTrade: Int, upForGrabs: Int) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item {
+            AssistChip(onClick = {}, label = { Text("$confirmed confirmed") })
+        }
+        item {
+            AssistChip(onClick = {}, label = { Text("$pendingTrade pending") })
+        }
+        item {
+            AssistChip(onClick = {}, label = { Text("$upForGrabs open") })
         }
     }
 }
