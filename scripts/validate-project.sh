@@ -13,6 +13,7 @@ required_files=(
   "app/src/test/java/com/shiftsync/app/domain/usecase/CalculateWeeklyScheduleMetricsUseCaseTest.kt"
   "README.md"
   "docs/demo-checklist.md"
+  "docs/adr/0001-offline-first-scheduling.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -27,6 +28,7 @@ grep -q "Jetpack Compose" README.md
 grep -q "AI Workflow Transparency" README.md
 grep -q "Testing" README.md
 grep -q "ShiftSync Demo Checklist" docs/demo-checklist.md
+grep -q "Offline-First Scheduling Boundary" docs/adr/0001-offline-first-scheduling.md
 
 if grep -R "TODO\\|FIXME" app/src README.md; then
   echo "Found unfinished TODO/FIXME markers."

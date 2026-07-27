@@ -36,6 +36,8 @@ The project is organized by layer:
 - **Room models included:** the sample app runs with `InMemoryScheduleRepository`, while `OfflineFirstScheduleRepository` shows the production path for instant cached schedules.
 - **Conflict rules in domain layer:** overlapping shifts and weekly hour limits are testable without Android dependencies.
 
+Architecture decisions are documented in [docs/adr](docs/adr), starting with the offline-first scheduling boundary.
+
 ## AI Workflow Transparency
 
 The Smart Shift Assistant boundary is intentionally explicit. In production, `AssistantApi` can point at OpenAI, Gemini, or an internal scheduling service. In this sample, the repository returns deterministic AI-style text so the app remains demoable without secrets.
