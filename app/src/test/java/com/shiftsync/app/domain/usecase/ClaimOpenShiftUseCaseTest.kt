@@ -45,6 +45,26 @@ class ClaimOpenShiftUseCaseTest {
         coVerify(exactly = 0) { repository.claimOpenShift(any(), any()) }
     }
 
+    @Test
+    fun `rejects a shift that is no longer up for grabs`() = runTest {
+        val result = useCase("emp-1", openShift().copy(status = ShiftStatus.PendingTrade))
+
+        assertTrue(result.isFailure)
+        assertEquals("This shift is no longer available to claim.", result.exceptionOrNull()?.message)
+        coVerify(exactly = 0) { repository.shiftsForEmployee(any()) }
+        coVerify(exactly = 0) { repository.claimOpenShift(any(), any()) }
+    }
+
+    @Test
+    fun `rejects an open shift that already has an employee`() = runTest {
+        val result = useCase("emp-1", openShift().copy(employeeId = "emp-2"))
+
+        assertTrue(result.isFailure)
+        assertEquals("This shift has already been assigned.", result.exceptionOrNull()?.message)
+        coVerify(exactly = 0) { repository.shiftsForEmployee(any()) }
+        coVerify(exactly = 0) { repository.claimOpenShift(any(), any()) }
+    }
+
     private fun openShift(): Shift {
         return Shift(
             id = "shift-open",
