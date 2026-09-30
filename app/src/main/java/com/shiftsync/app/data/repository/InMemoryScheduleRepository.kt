@@ -9,6 +9,7 @@ import com.shiftsync.app.domain.model.TradeRequestStatus
 import com.shiftsync.app.domain.repository.ScheduleRepository
 import com.shiftsync.app.domain.usecase.CalculateWeeklyScheduleMetricsUseCase
 import com.shiftsync.app.domain.usecase.DraftSwapNoteUseCase
+import com.shiftsync.app.domain.usecase.SummarizeOpenCoverageUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -20,6 +21,7 @@ class InMemoryScheduleRepository : ScheduleRepository {
     private val employees = MutableStateFlow(SeedData.employees)
     private val calculateWeeklyScheduleMetrics = CalculateWeeklyScheduleMetricsUseCase()
     private val draftSwapNote = DraftSwapNoteUseCase()
+    private val summarizeOpenCoverage = SummarizeOpenCoverageUseCase()
 
     override fun observeMyShifts(employeeId: String): Flow<List<Shift>> {
         return shifts.map { items -> items.filter { it.employeeId == employeeId }.sortedBy { it.startsAt } }
@@ -61,7 +63,7 @@ class InMemoryScheduleRepository : ScheduleRepository {
         return ScheduleInsight(
             totalHours = metrics.totalHours,
             estimatedEarningsCents = metrics.estimatedEarningsCents,
-            coverageGaps = listOf("Thursday lunch has one open Server shift", "Saturday close needs backup Host coverage"),
+            coverageGaps = summarizeOpenCoverage(shifts.value),
             summary = "${employee.name} has ${"%.1f".format(metrics.totalHours)} hours, ${metrics.dinnerShiftCount} dinner shifts, and about ${formatCents(metrics.estimatedEarningsCents)} in base wages."
         )
     }

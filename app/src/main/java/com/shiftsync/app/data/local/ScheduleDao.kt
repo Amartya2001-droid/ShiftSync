@@ -20,6 +20,9 @@ interface ScheduleDao {
     @Query("SELECT * FROM shifts WHERE employeeId = :employeeId")
     suspend fun shiftsForEmployee(employeeId: String): List<ShiftEntity>
 
+    @Query("SELECT * FROM shifts WHERE status = 'UpForGrabs' ORDER BY startsAt")
+    suspend fun openShifts(): List<ShiftEntity>
+
     @Query("SELECT * FROM shifts WHERE id = :shiftId")
     suspend fun shiftById(shiftId: String): ShiftEntity?
 

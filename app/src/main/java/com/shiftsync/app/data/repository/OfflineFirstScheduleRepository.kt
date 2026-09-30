@@ -11,6 +11,7 @@ import com.shiftsync.app.domain.model.TradeRequestStatus
 import com.shiftsync.app.domain.repository.ScheduleRepository
 import com.shiftsync.app.domain.usecase.CalculateWeeklyScheduleMetricsUseCase
 import com.shiftsync.app.domain.usecase.DraftSwapNoteUseCase
+import com.shiftsync.app.domain.usecase.SummarizeOpenCoverageUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant
@@ -21,6 +22,7 @@ class OfflineFirstScheduleRepository(
 ) : ScheduleRepository {
     private val calculateWeeklyScheduleMetrics = CalculateWeeklyScheduleMetricsUseCase()
     private val draftSwapNote = DraftSwapNoteUseCase()
+    private val summarizeOpenCoverage = SummarizeOpenCoverageUseCase()
 
     override fun observeMyShifts(employeeId: String): Flow<List<Shift>> {
         return dao.observeShiftsForEmployee(employeeId).map { entities -> entities.map { it.toDomain() } }
@@ -67,11 +69,7 @@ class OfflineFirstScheduleRepository(
         val employee = SeedData.employees.first { it.id == employeeId }
         val shifts = shiftsForEmployee(employeeId)
         val metrics = calculateWeeklyScheduleMetrics(shifts, employee.hourlyRateCents)
-        val gaps = shifts
-            .groupBy { it.role }
-            .filterValues { roleShifts -> roleShifts.sumOf { it.hours } < 10.0 }
-            .keys
-            .map { "Light ${it.name} coverage this week" }
+        val gaps = summarizeOpenCoverage(dao.openShifts().map { it.toDomain() })
 
         return ScheduleInsight(
             totalHours = metrics.totalHours,
