@@ -25,10 +25,13 @@ class CoverageInsightFlowTest {
             runCurrent()
             assertEquals(2, viewModel.state.value.insight!!.coverageGaps.size)
             val open = viewModel.state.value.openShifts.first()
+            val initialHours = viewModel.state.value.insight!!.totalHours
             viewModel.claimShift(open)
             runCurrent()
             assertEquals("Shift claimed", viewModel.state.value.snackbarMessage)
             assertEquals(1, viewModel.state.value.insight!!.coverageGaps.size)
+            assertEquals(initialHours + open.hours, viewModel.state.value.insight!!.totalHours)
+            assertTrue(viewModel.state.value.insight!!.coverageGaps.none { it.contains("Host") })
             viewModel.openSwapDialog(open)
             viewModel.submitSwap(false)
             runCurrent()
