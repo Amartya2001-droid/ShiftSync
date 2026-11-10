@@ -53,14 +53,20 @@ Included tests:
 - `CalculateWeeklyScheduleMetricsUseCaseTest`: weekly hours, dinner shift count, and estimated earnings.
 - `SwapRequestDialogTest`: Compose dialog opens, accepts input, and submits the smart-note action.
 
-Run locally from the project root after installing Android Gradle tooling:
+Run from the project root with JDK 17, Gradle 8.9, and Android SDK 35 installed (there is currently no Gradle wrapper):
 
 ```bash
-./gradlew test
-./gradlew connectedAndroidTest
+bash scripts/validate-project.sh
+gradle assembleDebug testDebugUnitTest assembleDebugAndroidTest
+# Requires a connected Android device or emulator:
+gradle connectedDebugAndroidTest
 ```
 
-If a Gradle wrapper has not been generated yet, open the project in Android Studio and let it sync, or run `gradle wrapper` with a local Gradle install.
+CI builds the debug APK, runs JVM tests, and compiles instrumentation tests. Project validation alone checks structure and documentation; it does not execute Kotlin tests. `CoverageInsightFlowTest` checks seeded repository → use cases → ViewModel state after claiming and posting open shifts. Instrumentation execution requires a device and is not part of the hosted CI job.
+
+## Live status
+
+Not live yet — blocked by release preparation and distribution. There is no verified public app listing or live URL. This is a Kotlin/Android demo, not a hosted website. It runs on seeded in-memory data, which resets on restart. Room/Retrofit boundaries are included but are not wired into the demo; the assistant uses deterministic local text rather than a live AI service.
 
 ## Demo Entry Point
 

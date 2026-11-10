@@ -45,9 +45,9 @@ class MainViewModel(
                         snackbarMessage = it.snackbarMessage
                     )
                 }
+                refreshInsight()
             }
         }
-        refreshInsight()
     }
 
     fun openSwapDialog(shift: Shift) {
