@@ -13,6 +13,49 @@ import org.junit.jupiter.api.Test
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class CoverageInsightFlowTest {
     @Test
+    fun `external schedule changes refresh coverage through empty and reopened board`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val repository = InMemoryScheduleRepository()
+        val viewModel = MainViewModel(
+            repository, RequestShiftSwapUseCase(repository),
+            ClaimOpenShiftUseCase(repository, ValidateTradeEligibilityUseCase(repository)),
+            GetScheduleInsightsUseCase(repository), SeedData.currentEmployeeId
+        )
+        try {
+            runCurrent()
+            val initialHours = viewModel.state.value.insight!!.totalHours
+            val openShifts = viewModel.state.value.openShifts
+            assertEquals(2, openShifts.size)
+
+            // Simulate changes outside this ViewModel: the repository flow must trigger refresh.
+            openShifts.forEach { repository.claimOpenShift(it.id, "emp-sam") }
+            runCurrent()
+            assertTrue(viewModel.state.value.openShifts.isEmpty())
+            assertTrue(viewModel.state.value.insight!!.coverageGaps.isEmpty())
+            assertEquals(initialHours, viewModel.state.value.insight!!.totalHours)
+
+            val reopened = openShifts.first()
+            repository.postOpenShift(reopened.id, "Available again")
+            runCurrent()
+            assertEquals(listOf(reopened.id), viewModel.state.value.openShifts.map { it.id })
+            assertEquals(1, viewModel.state.value.insight!!.coverageGaps.size)
+            assertTrue(viewModel.state.value.insight!!.coverageGaps.single().contains("Host"))
+            assertEquals(initialHours, viewModel.state.value.insight!!.totalHours)
+
+            repository.claimOpenShift(reopened.id, SeedData.currentEmployeeId)
+            runCurrent()
+            assertTrue(viewModel.state.value.openShifts.isEmpty())
+            assertTrue(viewModel.state.value.insight!!.coverageGaps.isEmpty())
+            assertEquals(initialHours + reopened.hours, viewModel.state.value.insight!!.totalHours)
+            assertTrue(viewModel.state.value.myShifts.any { it.id == reopened.id })
+            assertNull(viewModel.state.value.snackbarMessage)
+        } finally {
+            viewModel.viewModelScope.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun `coverage updates after claiming and posting without manual refresh`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val repository = InMemoryScheduleRepository()
