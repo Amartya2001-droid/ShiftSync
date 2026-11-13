@@ -14,15 +14,19 @@ ShiftSync also includes AI-assisted notes and schedule insights. Those features 
 
 ShiftSync uses `ScheduleRepository` as the single presentation-facing data contract.
 
-- Room entities model the offline cache path.
+- Room is the active on-device source of truth for shifts, employees, and trade requests.
 - Retrofit DTOs model the backend integration path.
 - Domain use cases own scheduling rules, metrics, and note drafting.
-- The sample app uses `InMemoryScheduleRepository` so it can launch without credentials.
+- The app uses `OfflineFirstScheduleRepository` with an application-scoped database and a one-time, transactional sample seed. The employee table is the initialization marker; startup never resets an empty open board.
+- Shift updates and trade-request inserts share a transaction. Claims recheck availability inside the transaction so a stale request cannot overwrite a prior claimant.
+- `InMemoryScheduleRepository` remains a test fixture. No remote sync is implemented.
 - AI-style note drafting is exposed behind use cases and repository methods rather than embedded in Compose screens.
 
 ## Consequences
 
 - Compose screens stay focused on state rendering and events.
 - Business rules can be tested without Android dependencies.
-- The app can later replace seeded data with Room plus a real backend without rewriting the UI.
+- Local mutations survive process restarts. Clearing app storage removes them.
+- The sample schedule keeps its original seeded dates; it is not silently replaced each week.
+- A real backend and sync/conflict protocol remain future work. Existing Retrofit declarations are not a working service.
 - AI providers can change without leaking provider-specific prompts into presentation code.

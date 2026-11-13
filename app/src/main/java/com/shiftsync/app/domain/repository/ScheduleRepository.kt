@@ -7,6 +7,7 @@ import com.shiftsync.app.domain.model.TradeRequest
 import kotlinx.coroutines.flow.Flow
 
 interface ScheduleRepository {
+    suspend fun initialize() {}
     fun observeMyShifts(employeeId: String): Flow<List<Shift>>
     fun observeOpenShifts(): Flow<List<Shift>>
     fun observeTeam(): Flow<List<Employee>>

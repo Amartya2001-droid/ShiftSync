@@ -2,6 +2,11 @@ package com.shiftsync.app.presentation
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -16,6 +21,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.shiftsync.app.presentation.assistant.AssistantScreen
 import com.shiftsync.app.presentation.calendar.RosterScreen
 import com.shiftsync.app.presentation.marketplace.MarketplaceScreen
@@ -27,6 +33,23 @@ fun ShiftSyncApp(viewModel: MainViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Roster", "Marketplace", "Assistant")
+
+    if (state.isLoading || state.loadError != null) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+        ) {
+            if (state.isLoading) {
+                CircularProgressIndicator()
+                Text("Loading your saved schedule…")
+            } else {
+                Text(state.loadError.orEmpty())
+                Button(onClick = viewModel::loadSchedule) { Text("Retry") }
+            }
+        }
+        return
+    }
 
     LaunchedEffect(state.snackbarMessage) {
         state.snackbarMessage?.let {
