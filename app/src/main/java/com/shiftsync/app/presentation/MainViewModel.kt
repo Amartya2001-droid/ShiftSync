@@ -16,9 +16,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 
 class MainViewModel(
-    repository: ScheduleRepository,
+    private val repository: ScheduleRepository,
     private val requestShiftSwap: RequestShiftSwapUseCase,
     private val claimOpenShift: ClaimOpenShiftUseCase,
     private val getScheduleInsights: GetScheduleInsightsUseCase,
@@ -27,25 +29,40 @@ class MainViewModel(
     private val mutableState = MutableStateFlow(ScheduleUiState())
     val state: StateFlow<ScheduleUiState> = mutableState.asStateFlow()
 
+    private var scheduleJob: Job? = null
+
     init {
-        viewModelScope.launch {
-            combine(
-                repository.observeMyShifts(employeeId),
-                repository.observeOpenShifts(),
-                repository.observeTeam()
-            ) { myShifts, openShifts, team ->
-                ScheduleUiState(myShifts = myShifts, openShifts = openShifts, team = team)
-            }.collect { nextState ->
-                mutableState.update {
-                    nextState.copy(
-                        selectedShift = it.selectedShift,
-                        swapReason = it.swapReason,
-                        selectedRecipientId = it.selectedRecipientId,
-                        insight = it.insight,
-                        snackbarMessage = it.snackbarMessage
-                    )
+        loadSchedule()
+    }
+
+    fun loadSchedule() {
+        scheduleJob?.cancel()
+        mutableState.update { it.copy(isLoading = true, loadError = null) }
+        scheduleJob = viewModelScope.launch {
+            try {
+                repository.initialize()
+                combine(
+                    repository.observeMyShifts(employeeId),
+                    repository.observeOpenShifts(),
+                    repository.observeTeam()
+                ) { myShifts, openShifts, team ->
+                    ScheduleUiState(myShifts = myShifts, openShifts = openShifts, team = team)
+                }.collect { nextState ->
+                    mutableState.update {
+                        nextState.copy(
+                            selectedShift = it.selectedShift,
+                            swapReason = it.swapReason,
+                            selectedRecipientId = it.selectedRecipientId,
+                            insight = it.insight,
+                            snackbarMessage = it.snackbarMessage
+                        )
+                    }
+                    refreshInsight()
                 }
-                refreshInsight()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                mutableState.update { it.copy(isLoading = false, loadError = "Unable to load your saved schedule. Please retry.") }
             }
         }
     }
@@ -70,26 +87,38 @@ class MainViewModel(
         val snapshot = state.value
         val shift = snapshot.selectedShift ?: return
         viewModelScope.launch {
-            requestShiftSwap(
-                shiftId = shift.id,
-                recipientId = snapshot.selectedRecipientId,
-                reason = snapshot.swapReason,
-                useSmartNote = useSmartNote
-            )
-            mutableState.update {
-                it.copy(
-                    selectedShift = null,
-                    swapReason = "",
-                    selectedRecipientId = null,
-                    snackbarMessage = "Swap request sent"
+            try {
+                requestShiftSwap(
+                    shiftId = shift.id,
+                    recipientId = snapshot.selectedRecipientId,
+                    reason = snapshot.swapReason,
+                    useSmartNote = useSmartNote
                 )
+                mutableState.update {
+                    it.copy(
+                        selectedShift = null,
+                        swapReason = "",
+                        selectedRecipientId = null,
+                        snackbarMessage = "Swap request sent"
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                mutableState.update { it.copy(snackbarMessage = "Unable to save the swap request. Please retry.") }
             }
         }
     }
 
     fun claimShift(shift: Shift) {
         viewModelScope.launch {
-            val result = claimOpenShift(employeeId, shift)
+            val result = try {
+                claimOpenShift(employeeId, shift)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
             mutableState.update {
                 it.copy(snackbarMessage = result.fold(
                     onSuccess = { "Shift claimed" },
@@ -101,8 +130,14 @@ class MainViewModel(
 
     fun refreshInsight() {
         viewModelScope.launch {
-            val insight = getScheduleInsights(employeeId)
-            mutableState.update { it.copy(insight = insight) }
+            try {
+                val insight = getScheduleInsights(employeeId)
+                mutableState.update { it.copy(insight = insight) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                mutableState.update { it.copy(snackbarMessage = "Unable to refresh schedule insights. Please retry.") }
+            }
         }
     }
 
@@ -112,6 +147,8 @@ class MainViewModel(
 }
 
 data class ScheduleUiState(
+    val isLoading: Boolean = false,
+    val loadError: String? = null,
     val myShifts: List<Shift> = emptyList(),
     val openShifts: List<Shift> = emptyList(),
     val team: List<Employee> = emptyList(),

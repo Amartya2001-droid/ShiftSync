@@ -1,6 +1,7 @@
 package com.shiftsync.app.data.repository
 
-import com.shiftsync.app.data.local.ScheduleDao
+import androidx.room.withTransaction
+import com.shiftsync.app.data.local.ShiftSyncDatabase
 import com.shiftsync.app.data.local.toEntity
 import com.shiftsync.app.domain.model.Employee
 import com.shiftsync.app.domain.model.ScheduleInsight
@@ -18,11 +19,22 @@ import java.time.Instant
 import java.util.UUID
 
 class OfflineFirstScheduleRepository(
-    private val dao: ScheduleDao
+    private val database: ShiftSyncDatabase
 ) : ScheduleRepository {
+    private val dao = database.scheduleDao()
     private val calculateWeeklyScheduleMetrics = CalculateWeeklyScheduleMetricsUseCase()
     private val draftSwapNote = DraftSwapNoteUseCase()
     private val summarizeOpenCoverage = SummarizeOpenCoverageUseCase()
+
+    override suspend fun initialize() {
+        database.withTransaction {
+            // Employees are the seed marker; an empty open board must never be reseeded.
+            if (dao.employeeCount() == 0) {
+                dao.upsertEmployees(SeedData.employees.map { it.toEntity() })
+                dao.upsertShifts(SeedData.shifts().map { it.toEntity() })
+            }
+        }
+    }
 
     override fun observeMyShifts(employeeId: String): Flow<List<Shift>> {
         return dao.observeShiftsForEmployee(employeeId).map { entities -> entities.map { it.toDomain() } }
@@ -40,38 +52,37 @@ class OfflineFirstScheduleRepository(
         return dao.shiftsForEmployee(employeeId).map { it.toDomain() }
     }
 
-    override suspend fun postOpenShift(shiftId: String, note: String): TradeRequest {
+    override suspend fun postOpenShift(shiftId: String, note: String): TradeRequest = database.withTransaction {
         val shift = dao.shiftById(shiftId)?.toDomain() ?: error("Shift $shiftId not found")
         dao.upsertShift(shift.copy(status = ShiftStatus.UpForGrabs).toEntity())
-        return createTradeRequest(shiftId, null, note)
+        createTradeRequest(shiftId, null, note)
     }
 
-    override suspend fun requestSwap(shiftId: String, recipientId: String?, note: String): TradeRequest {
+    override suspend fun requestSwap(shiftId: String, recipientId: String?, note: String): TradeRequest = database.withTransaction {
         val shift = dao.shiftById(shiftId)?.toDomain() ?: error("Shift $shiftId not found")
         dao.upsertShift(shift.copy(status = ShiftStatus.PendingTrade).toEntity())
-        return createTradeRequest(shiftId, recipientId, note)
+        createTradeRequest(shiftId, recipientId, note)
     }
 
-    override suspend fun claimOpenShift(shiftId: String, employeeId: String): Shift {
-        val claimed = dao.shiftById(shiftId)
-            ?.toDomain()
-            ?.copy(employeeId = employeeId, status = ShiftStatus.Confirmed)
-            ?: error("Shift $shiftId not found")
+    override suspend fun claimOpenShift(shiftId: String, employeeId: String): Shift = database.withTransaction {
+        val shift = dao.shiftById(shiftId)?.toDomain() ?: error("Shift $shiftId not found")
+        check(shift.status == ShiftStatus.UpForGrabs) { "This shift is no longer available to claim." }
+        val claimed = shift.copy(employeeId = employeeId, status = ShiftStatus.Confirmed)
         dao.upsertShift(claimed.toEntity())
-        return claimed
+        claimed
     }
 
     override suspend fun generateSwapNote(reason: String): String {
         return draftSwapNote(reason)
     }
 
-    override suspend fun generateScheduleInsight(employeeId: String): ScheduleInsight {
-        val employee = SeedData.employees.first { it.id == employeeId }
+    override suspend fun generateScheduleInsight(employeeId: String): ScheduleInsight = database.withTransaction {
+        val employee = dao.employeeById(employeeId)?.toDomain() ?: error("Employee $employeeId not found")
         val shifts = shiftsForEmployee(employeeId)
         val metrics = calculateWeeklyScheduleMetrics(shifts, employee.hourlyRateCents)
         val gaps = summarizeOpenCoverage(dao.openShifts().map { it.toDomain() })
 
-        return ScheduleInsight(
+        ScheduleInsight(
             totalHours = metrics.totalHours,
             estimatedEarningsCents = metrics.estimatedEarningsCents,
             coverageGaps = gaps,

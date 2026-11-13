@@ -1,11 +1,12 @@
 # ShiftSync
 
-ShiftSync is a restaurant shift swapping and scheduling Android app built to demonstrate the kind of product and engineering judgment expected in a modern scheduling product. It uses Jetpack Compose, Clean Architecture, MVVM, Kotlin Flow, Room-ready offline caching, Retrofit-ready API boundaries, and focused scheduling business rules.
+ShiftSync is a restaurant shift swapping and scheduling Android app built to demonstrate the kind of product and engineering judgment expected in a modern scheduling product. It uses Jetpack Compose, Clean Architecture, MVVM, Kotlin Flow, durable Room storage, Retrofit-ready API boundaries, and focused scheduling business rules.
 
 ## What It Does
 
 - Weekly roster with assigned shifts, roles, sections, times, and status badges.
 - Trade marketplace where coworkers can claim open shifts.
+- On-device persistence for claims, open-board posts, targeted requests, and their notes across app restarts; the sample schedule is seeded once.
 - Swap request flow that lets staff post to the open board or target a teammate.
 - Conflict prevention for overlapping shifts and max weekly hour limits.
 - Smart Shift Assistant that drafts polite swap notes and summarizes weekly hours, coverage gaps, and wage estimates.
@@ -17,9 +18,9 @@ flowchart LR
     UI["Jetpack Compose UI"] --> VM["MainViewModel"]
     VM --> UC["Use Cases"]
     UC --> REPO["ScheduleRepository"]
-    REPO --> ROOM["Room cache"]
-    REPO --> API["Retrofit REST APIs"]
-    REPO --> AI["AI Assistant API"]
+    REPO --> ROOM["Room database (active)"]
+    REPO -. "future integration" .-> API["Retrofit REST APIs (not connected)"]
+    REPO -. "future integration" .-> AI["AI Assistant API (not connected)"]
 ```
 
 The project is organized by layer:
@@ -33,7 +34,7 @@ The project is organized by layer:
 - **Clean Architecture + MVVM:** scheduling rules live in use cases, keeping UI state simple and testable.
 - **Repository pattern:** the UI depends on `ScheduleRepository`, so local cache, REST sync, and AI service details remain replaceable.
 - **Kotlin Flow:** roster and marketplace screens update reactively as shifts are traded or claimed.
-- **Room models included:** the sample app runs with `InMemoryScheduleRepository`, while `OfflineFirstScheduleRepository` shows the production path for instant cached schedules.
+- **Durable local storage:** the app uses `OfflineFirstScheduleRepository` and a single application-scoped Room database. Initial seeding and shift/request writes are transactional. Existing data is never overwritten during startup; an empty open board stays empty. `InMemoryScheduleRepository` remains a lightweight test fixture. This is local persistence, not server sync.
 - **Conflict rules in domain layer:** overlapping shifts and weekly hour limits are testable without Android dependencies.
 
 Architecture decisions are documented in [docs/adr](docs/adr), starting with the offline-first scheduling boundary.
@@ -42,7 +43,7 @@ Architecture decisions are documented in [docs/adr](docs/adr), starting with the
 
 The Smart Shift Assistant boundary is intentionally explicit. In production, `AssistantApi` can point at OpenAI, Gemini, or an internal scheduling service. In this sample, the repository returns deterministic AI-style text so the app remains demoable without secrets.
 
-AI was useful for drafting mock data, README structure, and test boilerplate. The core domain model, repository boundaries, Compose state flow, and scheduling rules were designed manually around restaurant shift-swapping requirements.
+Codex assisted with triage, persistence wiring, transaction/error handling, tests, and documentation. Build/test claims below are grounded in actual CI results; device verification is reported separately.
 
 ## Testing
 
@@ -51,7 +52,9 @@ Included tests:
 - `ValidateTradeEligibilityUseCaseTest`: overlapping shifts, max-hour violations, and valid claims.
 - `RequestShiftSwapUseCaseTest`: smart-note path and open-board posting.
 - `CalculateWeeklyScheduleMetricsUseCaseTest`: weekly hours, dinner shift count, and estimated earnings.
-- `SwapRequestDialogTest`: Compose dialog opens, accepts input, and submits the smart-note action.
+- `SwapRequestDialogTest`: Compose dialog opens, accepts input, and submits the smart-note action (device instrumentation).
+- `PersistentScheduleRepositoryTest`: real file-backed Room database under Robolectric; reopen durability, idempotent/concurrent seeding, transaction rollback, concurrent claims, reactive queries, and stored wage rates.
+- `ScheduleStorageStateTest`: startup retry and save-error behavior through ViewModel state.
 
 Run from the project root with JDK 17, Gradle 8.9, and Android SDK 35 installed (there is currently no Gradle wrapper):
 
@@ -66,10 +69,12 @@ CI builds the debug APK, runs JVM tests, and compiles instrumentation tests. Pro
 
 ## Live status
 
-Not live yet — blocked by release preparation and distribution. There is no verified public app listing or live URL. This is a Kotlin/Android demo, not a hosted website. It runs on seeded in-memory data, which resets on restart. Room/Retrofit boundaries are included but are not wired into the demo; the assistant uses deterministic local text rather than a live AI service.
+Not live yet — blocked by release preparation and distribution. There is no verified public app listing or live URL. This is a Kotlin/Android demo, not a hosted website. It seeds restaurant sample data into a local Room database once. Claims and requests persist across restarts; sample dates are not rolled forward automatically. Uninstalling or clearing app storage resets local data. Retrofit boundaries are not connected; there is no authentication, multi-device sync, or production backend. The assistant uses deterministic local text rather than a live AI service. No API key is required for the current app.
 
 ## Demo Entry Point
 
-`MainActivity` wires an in-memory repository with seeded restaurant data so the app launches directly into the usable ShiftSync experience.
+`ShiftSyncApplication` owns `shiftsync.db` and the persistent repository. `MainActivity` wires it into the ViewModel; startup seeds the database on a background Room transaction before observing it. Loading failures offer Retry, and failed writes retain the swap input and show an error.
+
+To verify persistence manually: claim an open shift, post one of your roster shifts to the open board, then force-stop and relaunch the app. The claimed assignment, posted status, and coverage insights should remain. Rotation uses the same application database and ViewModel. UI taps and real-device lifecycle behavior still require device verification; Robolectric database tests are JVM tests, not a device test pass.
 
 For a reviewer-facing walkthrough, use [docs/demo-checklist.md](docs/demo-checklist.md).

@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.shiftsync.app.data.repository.InMemoryScheduleRepository
 import com.shiftsync.app.data.repository.SeedData
 import com.shiftsync.app.domain.usecase.ClaimOpenShiftUseCase
 import com.shiftsync.app.domain.usecase.GetScheduleInsightsUseCase
@@ -18,7 +17,7 @@ import com.shiftsync.app.ui.theme.ShiftSyncTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val repository = InMemoryScheduleRepository()
+        val repository = (application as ShiftSyncApplication).repository
         val validate = ValidateTradeEligibilityUseCase(repository)
         val factory = MainViewModelFactory(
             repository = repository,

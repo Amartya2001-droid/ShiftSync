@@ -8,6 +8,15 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ScheduleDao {
+    @Query("SELECT COUNT(*) FROM employees")
+    suspend fun employeeCount(): Int
+
+    @Query("SELECT * FROM employees WHERE id = :employeeId")
+    suspend fun employeeById(employeeId: String): EmployeeEntity?
+
+    @Query("SELECT * FROM trade_requests ORDER BY createdAt, id")
+    suspend fun tradeRequests(): List<TradeRequestEntity>
+
     @Query("SELECT * FROM shifts WHERE employeeId = :employeeId ORDER BY startsAt")
     fun observeShiftsForEmployee(employeeId: String): Flow<List<ShiftEntity>>
 
