@@ -24,32 +24,45 @@ class MainViewModel(
     private val requestShiftSwap: RequestShiftSwapUseCase,
     private val claimOpenShift: ClaimOpenShiftUseCase,
     private val getScheduleInsights: GetScheduleInsightsUseCase,
-    private val employeeId: String
+    private var employeeId: String
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(ScheduleUiState())
+    private val mutableState = MutableStateFlow(ScheduleUiState(currentEmployeeId = employeeId))
     val state: StateFlow<ScheduleUiState> = mutableState.asStateFlow()
 
     private var scheduleJob: Job? = null
+    private var insightJob: Job? = null
 
     init {
         loadSchedule()
     }
 
+    fun switchEmployee(nextEmployeeId: String) {
+        if (nextEmployeeId == employeeId || state.value.isBusy ||
+            state.value.team.none { it.id == nextEmployeeId }) return
+        employeeId = nextEmployeeId
+        insightJob?.cancel()
+        mutableState.value = ScheduleUiState(currentEmployeeId = nextEmployeeId)
+        loadSchedule()
+    }
+
     fun loadSchedule() {
+        val activeEmployeeId = employeeId
         scheduleJob?.cancel()
         mutableState.update { it.copy(isLoading = true, loadError = null) }
         scheduleJob = viewModelScope.launch {
             try {
                 repository.initialize()
                 combine(
-                    repository.observeMyShifts(employeeId),
+                    repository.observeMyShifts(activeEmployeeId),
                     repository.observeOpenShifts(),
                     repository.observeTeam()
                 ) { myShifts, openShifts, team ->
-                    ScheduleUiState(myShifts = myShifts, openShifts = openShifts, team = team)
+                    ScheduleUiState(currentEmployeeId = activeEmployeeId, myShifts = myShifts, openShifts = openShifts, team = team)
                 }.collect { nextState ->
                     mutableState.update {
                         nextState.copy(
+                            claimingShiftId = it.claimingShiftId,
+                            isSavingSwap = it.isSavingSwap,
                             selectedShift = it.selectedShift,
                             swapReason = it.swapReason,
                             selectedRecipientId = it.selectedRecipientId,
@@ -68,10 +81,13 @@ class MainViewModel(
     }
 
     fun openSwapDialog(shift: Shift) {
-        mutableState.update { it.copy(selectedShift = shift, swapReason = "", selectedRecipientId = null) }
+        if (state.value.isBusy) return
+        val owned = state.value.myShifts.firstOrNull { it.id == shift.id && it.employeeId == employeeId } ?: return
+        mutableState.update { it.copy(selectedShift = owned, swapReason = "", selectedRecipientId = null) }
     }
 
     fun dismissSwapDialog() {
+        if (state.value.isSavingSwap) return
         mutableState.update { it.copy(selectedShift = null, swapReason = "", selectedRecipientId = null) }
     }
 
@@ -86,13 +102,16 @@ class MainViewModel(
     fun submitSwap(useSmartNote: Boolean) {
         val snapshot = state.value
         val shift = snapshot.selectedShift ?: return
+        if (snapshot.isBusy || shift.employeeId != employeeId) return
+        mutableState.update { it.copy(isSavingSwap = true) }
         viewModelScope.launch {
             try {
                 requestShiftSwap(
                     shiftId = shift.id,
                     recipientId = snapshot.selectedRecipientId,
                     reason = snapshot.swapReason,
-                    useSmartNote = useSmartNote
+                    useSmartNote = useSmartNote,
+                    requesterId = snapshot.currentEmployeeId
                 )
                 mutableState.update {
                     it.copy(
@@ -106,21 +125,27 @@ class MainViewModel(
                 throw error
             } catch (error: Exception) {
                 mutableState.update { it.copy(snackbarMessage = "Unable to save the swap request. Please retry.") }
+            } finally {
+                mutableState.update { it.copy(isSavingSwap = false) }
             }
         }
     }
 
     fun claimShift(shift: Shift) {
+        if (state.value.isBusy || state.value.isLoading || shift.employeeId == employeeId) return
+        val claimantId = employeeId
+        mutableState.update { it.copy(claimingShiftId = shift.id) }
         viewModelScope.launch {
             val result = try {
-                claimOpenShift(employeeId, shift)
+                claimOpenShift(claimantId, shift)
             } catch (error: CancellationException) {
+                mutableState.update { it.copy(claimingShiftId = null) }
                 throw error
             } catch (error: Exception) {
                 Result.failure(error)
             }
             mutableState.update {
-                it.copy(snackbarMessage = result.fold(
+                it.copy(claimingShiftId = null, snackbarMessage = result.fold(
                     onSuccess = { "Shift claimed" },
                     onFailure = { error -> error.message ?: "Unable to claim shift" }
                 ))
@@ -129,9 +154,11 @@ class MainViewModel(
     }
 
     fun refreshInsight() {
-        viewModelScope.launch {
+        insightJob?.cancel()
+        val activeEmployeeId = employeeId
+        insightJob = viewModelScope.launch {
             try {
-                val insight = getScheduleInsights(employeeId)
+                val insight = getScheduleInsights(activeEmployeeId)
                 mutableState.update { it.copy(insight = insight) }
             } catch (error: CancellationException) {
                 throw error
@@ -147,6 +174,9 @@ class MainViewModel(
 }
 
 data class ScheduleUiState(
+    val currentEmployeeId: String = "",
+    val claimingShiftId: String? = null,
+    val isSavingSwap: Boolean = false,
     val isLoading: Boolean = false,
     val loadError: String? = null,
     val myShifts: List<Shift> = emptyList(),
@@ -157,7 +187,9 @@ data class ScheduleUiState(
     val swapReason: String = "",
     val insight: ScheduleInsight? = null,
     val snackbarMessage: String? = null
-)
+) {
+    val isBusy: Boolean get() = claimingShiftId != null || isSavingSwap
+}
 
 class MainViewModelFactory(
     private val repository: ScheduleRepository,

@@ -3,6 +3,8 @@ package com.shiftsync.app.data.repository
 import androidx.room.withTransaction
 import com.shiftsync.app.data.local.ShiftSyncDatabase
 import com.shiftsync.app.data.local.toEntity
+import com.shiftsync.app.domain.model.EligibilityResult
+import com.shiftsync.app.domain.usecase.ValidateTradeEligibilityUseCase
 import com.shiftsync.app.domain.model.Employee
 import com.shiftsync.app.domain.model.ScheduleInsight
 import com.shiftsync.app.domain.model.Shift
@@ -52,23 +54,32 @@ class OfflineFirstScheduleRepository(
         return dao.shiftsForEmployee(employeeId).map { it.toDomain() }
     }
 
-    override suspend fun postOpenShift(shiftId: String, note: String): TradeRequest = database.withTransaction {
+    override suspend fun postOpenShift(shiftId: String, note: String, requesterId: String): TradeRequest = database.withTransaction {
         val shift = dao.shiftById(shiftId)?.toDomain() ?: error("Shift $shiftId not found")
+        check(shift.employeeId == requesterId) { "Only the current owner can offer this shift." }
         dao.upsertShift(shift.copy(status = ShiftStatus.UpForGrabs).toEntity())
-        createTradeRequest(shiftId, null, note)
+        createTradeRequest(shiftId, null, note, requesterId)
     }
 
-    override suspend fun requestSwap(shiftId: String, recipientId: String?, note: String): TradeRequest = database.withTransaction {
+    override suspend fun requestSwap(shiftId: String, recipientId: String?, note: String, requesterId: String): TradeRequest = database.withTransaction {
         val shift = dao.shiftById(shiftId)?.toDomain() ?: error("Shift $shiftId not found")
+        check(shift.employeeId == requesterId) { "Only the current owner can offer this shift." }
         dao.upsertShift(shift.copy(status = ShiftStatus.PendingTrade).toEntity())
-        createTradeRequest(shiftId, recipientId, note)
+        createTradeRequest(shiftId, recipientId, note, requesterId)
     }
 
     override suspend fun claimOpenShift(shiftId: String, employeeId: String): Shift = database.withTransaction {
         val shift = dao.shiftById(shiftId)?.toDomain() ?: error("Shift $shiftId not found")
         check(shift.status == ShiftStatus.UpForGrabs) { "This shift is no longer available to claim." }
+        check(shift.employeeId != employeeId) { "You already own this shift." }
+        check(dao.employeeById(employeeId) != null) { "Employee not found." }
+        val eligibility = ValidateTradeEligibilityUseCase(this)(employeeId, shift)
+        check(eligibility == EligibilityResult.Eligible) {
+            (eligibility as EligibilityResult.Ineligible).reason
+        }
         val claimed = shift.copy(employeeId = employeeId, status = ShiftStatus.Confirmed)
         dao.upsertShift(claimed.toEntity())
+        dao.resolveRequestsForClaim(shiftId, employeeId)
         claimed
     }
 
@@ -90,11 +101,11 @@ class OfflineFirstScheduleRepository(
         )
     }
 
-    private suspend fun createTradeRequest(shiftId: String, recipientId: String?, note: String): TradeRequest {
+    private suspend fun createTradeRequest(shiftId: String, recipientId: String?, note: String, requesterId: String): TradeRequest {
         val request = TradeRequest(
             id = UUID.randomUUID().toString(),
             shiftId = shiftId,
-            requesterId = SeedData.currentEmployeeId,
+            requesterId = requesterId,
             recipientId = recipientId,
             note = note,
             status = TradeRequestStatus.Pending,
