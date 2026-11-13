@@ -12,8 +12,9 @@ interface ScheduleRepository {
     fun observeOpenShifts(): Flow<List<Shift>>
     fun observeTeam(): Flow<List<Employee>>
     suspend fun shiftsForEmployee(employeeId: String): List<Shift>
-    suspend fun postOpenShift(shiftId: String, note: String): TradeRequest
-    suspend fun requestSwap(shiftId: String, recipientId: String?, note: String): TradeRequest
+    suspend fun postOpenShift(shiftId: String, note: String, requesterId: String): TradeRequest
+    suspend fun requestSwap(shiftId: String, recipientId: String?, note: String, requesterId: String): TradeRequest
+    // Must validate the current owner, availability and eligibility atomically with the transfer.
     suspend fun claimOpenShift(shiftId: String, employeeId: String): Shift
     suspend fun generateSwapNote(reason: String): String
     suspend fun generateScheduleInsight(employeeId: String): ScheduleInsight

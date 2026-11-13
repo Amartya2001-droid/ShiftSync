@@ -8,7 +8,6 @@ import com.shiftsync.app.data.repository.SeedData
 import com.shiftsync.app.domain.usecase.ClaimOpenShiftUseCase
 import com.shiftsync.app.domain.usecase.GetScheduleInsightsUseCase
 import com.shiftsync.app.domain.usecase.RequestShiftSwapUseCase
-import com.shiftsync.app.domain.usecase.ValidateTradeEligibilityUseCase
 import com.shiftsync.app.presentation.MainViewModel
 import com.shiftsync.app.presentation.MainViewModelFactory
 import com.shiftsync.app.presentation.ShiftSyncApp
@@ -18,11 +17,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val repository = (application as ShiftSyncApplication).repository
-        val validate = ValidateTradeEligibilityUseCase(repository)
         val factory = MainViewModelFactory(
             repository = repository,
             requestShiftSwap = RequestShiftSwapUseCase(repository),
-            claimOpenShift = ClaimOpenShiftUseCase(repository, validate),
+            claimOpenShift = ClaimOpenShiftUseCase(repository),
             getScheduleInsights = GetScheduleInsightsUseCase(repository),
             employeeId = SeedData.currentEmployeeId
         )

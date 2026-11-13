@@ -19,24 +19,24 @@ class RequestShiftSwapUseCaseTest {
     fun `uses assistant generated note when smart note is enabled`() = runTest {
         val request = request()
         coEvery { repository.generateSwapNote("exam conflict") } returns "Polite generated note"
-        coEvery { repository.requestSwap("shift-1", "emp-2", "Polite generated note") } returns request
+        coEvery { repository.requestSwap("shift-1", "emp-2", "Polite generated note", "emp-1") } returns request
 
-        val result = useCase("shift-1", "emp-2", "exam conflict", useSmartNote = true)
+        val result = useCase("shift-1", "emp-2", "exam conflict", useSmartNote = true, requesterId = "emp-1")
 
         assertEquals(request, result)
         coVerify { repository.generateSwapNote("exam conflict") }
-        coVerify { repository.requestSwap("shift-1", "emp-2", "Polite generated note") }
+        coVerify { repository.requestSwap("shift-1", "emp-2", "Polite generated note", "emp-1") }
     }
 
     @Test
     fun `posts to open board when no recipient is selected`() = runTest {
         val request = request(recipientId = null)
-        coEvery { repository.postOpenShift("shift-1", "Need coverage") } returns request
+        coEvery { repository.postOpenShift("shift-1", "Need coverage", "emp-1") } returns request
 
-        val result = useCase("shift-1", null, "Need coverage", useSmartNote = false)
+        val result = useCase("shift-1", null, "Need coverage", useSmartNote = false, requesterId = "emp-1")
 
         assertEquals(request, result)
-        coVerify { repository.postOpenShift("shift-1", "Need coverage") }
+        coVerify { repository.postOpenShift("shift-1", "Need coverage", "emp-1") }
     }
 
     private fun request(recipientId: String? = "emp-2"): TradeRequest {

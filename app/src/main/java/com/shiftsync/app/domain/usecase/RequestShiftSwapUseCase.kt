@@ -10,7 +10,8 @@ class RequestShiftSwapUseCase(
         shiftId: String,
         recipientId: String?,
         reason: String,
-        useSmartNote: Boolean
+        useSmartNote: Boolean,
+        requesterId: String
     ): TradeRequest {
         val note = if (useSmartNote) {
             repository.generateSwapNote(reason)
@@ -19,9 +20,9 @@ class RequestShiftSwapUseCase(
         }
 
         return if (recipientId == null) {
-            repository.postOpenShift(shiftId, note)
+            repository.postOpenShift(shiftId, note, requesterId)
         } else {
-            repository.requestSwap(shiftId, recipientId, note)
+            repository.requestSwap(shiftId, recipientId, note, requesterId)
         }
     }
 }

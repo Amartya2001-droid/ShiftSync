@@ -25,7 +25,8 @@ fun SwapRequestDialog(
     onReasonChange: (String) -> Unit,
     onRecipientSelected: (String?) -> Unit,
     onDismiss: () -> Unit,
-    onSubmit: (Boolean) -> Unit
+    onSubmit: (Boolean) -> Unit,
+    isSubmitting: Boolean = false
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -56,12 +57,12 @@ fun SwapRequestDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onSubmit(true) }) {
-                Text("Send Smart Note")
+            Button(onClick = { onSubmit(true) }, enabled = !isSubmitting) {
+                Text(if (isSubmitting) "Saving…" else "Send Smart Note")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, enabled = !isSubmitting) {
                 Text("Cancel")
             }
         }

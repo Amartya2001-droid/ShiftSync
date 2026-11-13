@@ -39,7 +39,14 @@ fun MarketplaceScreen(
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(prioritizedShifts, key = { it.id }) { shift ->
-                    OpenShiftCard(shift = shift, onClaimShift = { onClaimShift(shift) })
+                    OpenShiftCard(
+                        shift = shift,
+                        ownerName = state.team.find { it.id == shift.employeeId }?.name,
+                        isOwnShift = shift.employeeId == state.currentEmployeeId,
+                        isClaiming = state.claimingShiftId == shift.id,
+                        canClaim = !state.isBusy,
+                        onClaimShift = { onClaimShift(shift) }
+                    )
                 }
             }
         }
@@ -47,14 +54,27 @@ fun MarketplaceScreen(
 }
 
 @Composable
-private fun OpenShiftCard(shift: Shift, onClaimShift: () -> Unit) {
+private fun OpenShiftCard(
+    shift: Shift,
+    ownerName: String?,
+    isOwnShift: Boolean,
+    isClaiming: Boolean,
+    canClaim: Boolean,
+    onClaimShift: () -> Unit
+) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("${RoleFormatter.label(shift.role)} - ${shift.section}", style = MaterialTheme.typography.titleMedium)
             Text(ShiftTimeFormatter.fullRange(shift))
             StatusBadge(status = shift.status)
-            Button(onClick = onClaimShift) {
-                Text("Claim Shift")
+            Text(if (shift.employeeId == null) "Unassigned shift" else "Currently assigned to ${ownerName ?: "a teammate"}")
+            if (isOwnShift) Text("You keep this shift until a coworker claims it.")
+            Button(onClick = onClaimShift, enabled = canClaim && !isOwnShift) {
+                Text(when {
+                    isOwnShift -> "Your posted shift"
+                    isClaiming -> "Claiming…"
+                    else -> "Claim Shift"
+                })
             }
         }
     }

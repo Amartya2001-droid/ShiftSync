@@ -5,10 +5,12 @@ ShiftSync is a restaurant shift swapping and scheduling Android app built to dem
 ## What It Does
 
 - Weekly roster with assigned shifts, roles, sections, times, and status badges.
-- Trade marketplace where coworkers can claim open shifts.
+- Trade marketplace where coworkers can claim unassigned or teammate-posted shifts. Posting retains the original owner until a successful claim transfers the assignment.
+- Clearly labeled **Demo employee** selector to exercise the two-person workflow on one device; this is local sample identity selection, not authentication. The selection resets to Maya after process restart.
 - On-device persistence for claims, open-board posts, targeted requests, and their notes across app restarts; the sample schedule is seeded once.
 - Swap request flow that lets staff post to the open board or target a teammate.
-- Conflict prevention for overlapping shifts and max weekly hour limits.
+- Atomic ownership transfer with saved-state checks for self-claims, unavailable shifts, unknown employees, overlap, minimum rest, and weekly hour limits. Competing claims cannot overwrite a winner or jointly exceed the weekly limit.
+- Successful claims accept pending open-board requests and reject superseded targeted requests in the same transaction. Request history UI and targeted-request acceptance remain future work.
 - Smart Shift Assistant that drafts polite swap notes and summarizes weekly hours, coverage gaps, and wage estimates.
 
 ## Architecture
@@ -35,7 +37,7 @@ The project is organized by layer:
 - **Repository pattern:** the UI depends on `ScheduleRepository`, so local cache, REST sync, and AI service details remain replaceable.
 - **Kotlin Flow:** roster and marketplace screens update reactively as shifts are traded or claimed.
 - **Durable local storage:** the app uses `OfflineFirstScheduleRepository` and a single application-scoped Room database. Initial seeding and shift/request writes are transactional. Existing data is never overwritten during startup; an empty open board stays empty. `InMemoryScheduleRepository` remains a lightweight test fixture. This is local persistence, not server sync.
-- **Conflict rules in domain layer:** overlapping shifts and weekly hour limits are testable without Android dependencies.
+- **Conflict rules in domain layer:** eligibility rules are checked by the repository inside the Room write transaction (or the fixture mutex). The UI snapshot is never the source of truth for a claim. Posting also checks the expected owner to reject stale dialogs after a transfer.
 
 Architecture decisions are documented in [docs/adr](docs/adr), starting with the offline-first scheduling boundary.
 
@@ -53,7 +55,8 @@ Included tests:
 - `RequestShiftSwapUseCaseTest`: smart-note path and open-board posting.
 - `CalculateWeeklyScheduleMetricsUseCaseTest`: weekly hours, dinner shift count, and estimated earnings.
 - `SwapRequestDialogTest`: Compose dialog opens, accepts input, and submits the smart-note action (device instrumentation).
-- `PersistentScheduleRepositoryTest`: real file-backed Room database under Robolectric; reopen durability, idempotent/concurrent seeding, transaction rollback, concurrent claims, reactive queries, and stored wage rates.
+- `PersistentScheduleRepositoryTest`: real file-backed Room database under Robolectric; reopen durability, seeding, transaction rollback, posted-shift transfers and request resolution, stale ownership, rejected claims, competing claims, concurrent weekly limits, rest checks, reactive queries, and stored wage rates.
+- `ClaimOwnershipFlowTest`: two employees posting/claiming through ViewModels, roster and insight refreshes, local employee switching, and duplicate-tap protection.
 - `ScheduleStorageStateTest`: startup retry and save-error behavior through ViewModel state.
 
 Run from the project root with JDK 17, Gradle 8.9, and Android SDK 35 installed (there is currently no Gradle wrapper):
@@ -75,6 +78,6 @@ Not live yet — blocked by release preparation and distribution. There is no ve
 
 `ShiftSyncApplication` owns `shiftsync.db` and the persistent repository. `MainActivity` wires it into the ViewModel; startup seeds the database on a background Room transaction before observing it. Loading failures offer Retry, and failed writes retain the swap input and show an error.
 
-To verify persistence manually: claim an open shift, post one of your roster shifts to the open board, then force-stop and relaunch the app. The claimed assignment, posted status, and coverage insights should remain. Rotation uses the same application database and ViewModel. UI taps and real-device lifecycle behavior still require device verification; Robolectric database tests are JVM tests, not a device test pass.
+To exercise ownership: as Maya, post a roster shift to the open board. It remains in Maya’s roster; Marketplace identifies the owner and disables self-claim. Use **Demo employee** to select Sam, claim the posted shift, then switch back to Maya. The shift should be removed from Maya’s roster and added to Sam’s, with updated hours and coverage gaps. Force-stop and relaunch to check durability (the demo employee selection resets to Maya). Conflicting or stale claims show an error and keep the current owner. Employee switching and repeated claim taps are disabled during a write. Rotation uses the same application database and ViewModel. UI taps and real-device lifecycle behavior still require device verification; Robolectric database tests are JVM tests, not a device test pass.
 
 For a reviewer-facing walkthrough, use [docs/demo-checklist.md](docs/demo-checklist.md).
