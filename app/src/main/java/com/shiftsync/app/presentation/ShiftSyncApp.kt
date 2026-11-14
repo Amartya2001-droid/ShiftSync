@@ -2,8 +2,12 @@ package com.shiftsync.app.presentation
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.Alignment
@@ -17,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -61,6 +66,22 @@ fun ShiftSyncApp(viewModel: MainViewModel) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            var expanded by remember { mutableStateOf(false) }
+            Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                TextButton(onClick = { expanded = true }, enabled = !state.isBusy) {
+                    Text("Demo employee: ${state.team.find { it.id == state.currentEmployeeId }?.name.orEmpty()}")
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    state.team.forEach { employee ->
+                        DropdownMenuItem(
+                            text = { Text(employee.name) },
+                            onClick = { expanded = false; viewModel.switchEmployee(employee.id) }
+                        )
+                    }
+                }
+            }
+        },
         bottomBar = {
             NavigationBar {
                 tabs.forEachIndexed { index, label ->
@@ -96,6 +117,7 @@ fun ShiftSyncApp(viewModel: MainViewModel) {
     state.selectedShift?.let { shift ->
         SwapRequestDialog(
             shift = shift,
+            isSubmitting = state.isSavingSwap,
             team = state.team,
             selectedRecipientId = state.selectedRecipientId,
             reason = state.swapReason,

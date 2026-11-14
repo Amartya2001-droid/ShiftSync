@@ -1,5 +1,9 @@
 package com.shiftsync.app.data.repository
 
+import com.shiftsync.app.domain.model.EligibilityResult
+import com.shiftsync.app.domain.usecase.ValidateTradeEligibilityUseCase
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import com.shiftsync.app.domain.model.Employee
 import com.shiftsync.app.domain.model.ScheduleInsight
 import com.shiftsync.app.domain.model.Shift
@@ -17,6 +21,8 @@ import java.time.Instant
 import java.util.UUID
 
 class InMemoryScheduleRepository : ScheduleRepository {
+    private val mutationLock = Mutex()
+    private var requests = emptyList<TradeRequest>()
     private val shifts = MutableStateFlow(SeedData.shifts())
     private val employees = MutableStateFlow(SeedData.employees)
     private val calculateWeeklyScheduleMetrics = CalculateWeeklyScheduleMetricsUseCase()
@@ -37,19 +43,37 @@ class InMemoryScheduleRepository : ScheduleRepository {
         return shifts.value.filter { it.employeeId == employeeId }
     }
 
-    override suspend fun postOpenShift(shiftId: String, note: String): TradeRequest {
+    override suspend fun postOpenShift(shiftId: String, note: String, requesterId: String): TradeRequest = mutationLock.withLock {
+        val shift = shifts.value.first { it.id == shiftId }
+        check(shift.employeeId == requesterId) { "Only the current owner can offer this shift." }
         updateShift(shiftId) { it.copy(status = ShiftStatus.UpForGrabs) }
-        return newRequest(shiftId, null, note)
+        newRequest(shiftId, null, note, requesterId)
     }
 
-    override suspend fun requestSwap(shiftId: String, recipientId: String?, note: String): TradeRequest {
+    override suspend fun requestSwap(shiftId: String, recipientId: String?, note: String, requesterId: String): TradeRequest = mutationLock.withLock {
+        val shift = shifts.value.first { it.id == shiftId }
+        check(shift.employeeId == requesterId) { "Only the current owner can offer this shift." }
         updateShift(shiftId) { it.copy(status = ShiftStatus.PendingTrade) }
-        return newRequest(shiftId, recipientId, note)
+        newRequest(shiftId, recipientId, note, requesterId)
     }
 
-    override suspend fun claimOpenShift(shiftId: String, employeeId: String): Shift {
+    override suspend fun claimOpenShift(shiftId: String, employeeId: String): Shift = mutationLock.withLock {
+        val shift = shifts.value.first { it.id == shiftId }
+        check(shift.status == ShiftStatus.UpForGrabs) { "This shift is no longer available to claim." }
+        check(shift.employeeId != employeeId) { "You already own this shift." }
+        check(employees.value.any { it.id == employeeId }) { "Employee not found." }
+        val eligibility = ValidateTradeEligibilityUseCase(this)(employeeId, shift)
+        check(eligibility == EligibilityResult.Eligible) {
+            (eligibility as EligibilityResult.Ineligible).reason
+        }
         val claimed = updateShift(shiftId) { it.copy(employeeId = employeeId, status = ShiftStatus.Confirmed) }
-        return claimed
+        requests = requests.map {
+            if (it.shiftId == shiftId && it.status == TradeRequestStatus.Pending) {
+                if (it.recipientId == null) it.copy(status = TradeRequestStatus.Accepted, recipientId = employeeId)
+                else it.copy(status = TradeRequestStatus.Rejected)
+            } else it
+        }
+        claimed
     }
 
     override suspend fun generateSwapNote(reason: String): String {
@@ -80,16 +104,18 @@ class InMemoryScheduleRepository : ScheduleRepository {
         return updated ?: error("Shift $shiftId not found")
     }
 
-    private fun newRequest(shiftId: String, recipientId: String?, note: String): TradeRequest {
-        return TradeRequest(
+    private fun newRequest(shiftId: String, recipientId: String?, note: String, requesterId: String): TradeRequest {
+        val request = TradeRequest(
             id = UUID.randomUUID().toString(),
             shiftId = shiftId,
-            requesterId = SeedData.currentEmployeeId,
+            requesterId = requesterId,
             recipientId = recipientId,
             note = note,
             status = TradeRequestStatus.Pending,
             createdAt = Instant.now()
         )
+        requests = requests + request
+        return request
     }
 
     private fun formatCents(cents: Int): String = "$${"%.2f".format(cents / 100.0)}"

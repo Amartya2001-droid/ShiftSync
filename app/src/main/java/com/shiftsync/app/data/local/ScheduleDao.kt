@@ -8,6 +8,14 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ScheduleDao {
+    @Query("""
+        UPDATE trade_requests
+        SET status = CASE WHEN recipientId IS NULL THEN 'Accepted' ELSE 'Rejected' END,
+            recipientId = CASE WHEN recipientId IS NULL THEN :employeeId ELSE recipientId END
+        WHERE shiftId = :shiftId AND status = 'Pending'
+    """)
+    suspend fun resolveRequestsForClaim(shiftId: String, employeeId: String)
+
     @Query("SELECT COUNT(*) FROM employees")
     suspend fun employeeCount(): Int
 

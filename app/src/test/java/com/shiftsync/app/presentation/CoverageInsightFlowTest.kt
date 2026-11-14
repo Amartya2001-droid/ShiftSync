@@ -18,7 +18,7 @@ class CoverageInsightFlowTest {
         val repository = InMemoryScheduleRepository()
         val viewModel = MainViewModel(
             repository, RequestShiftSwapUseCase(repository),
-            ClaimOpenShiftUseCase(repository, ValidateTradeEligibilityUseCase(repository)),
+            ClaimOpenShiftUseCase(repository),
             GetScheduleInsightsUseCase(repository), SeedData.currentEmployeeId
         )
         try {
@@ -35,7 +35,7 @@ class CoverageInsightFlowTest {
             assertEquals(initialHours, viewModel.state.value.insight!!.totalHours)
 
             val reopened = openShifts.first()
-            repository.postOpenShift(reopened.id, "Available again")
+            repository.postOpenShift(reopened.id, "Available again", "emp-sam")
             runCurrent()
             assertEquals(listOf(reopened.id), viewModel.state.value.openShifts.map { it.id })
             assertEquals(1, viewModel.state.value.insight!!.coverageGaps.size)
@@ -61,7 +61,7 @@ class CoverageInsightFlowTest {
         val repository = InMemoryScheduleRepository()
         val viewModel = MainViewModel(
             repository, RequestShiftSwapUseCase(repository),
-            ClaimOpenShiftUseCase(repository, ValidateTradeEligibilityUseCase(repository)),
+            ClaimOpenShiftUseCase(repository),
             GetScheduleInsightsUseCase(repository), SeedData.currentEmployeeId
         )
         try {

@@ -46,7 +46,7 @@ class ScheduleStorageStateTest {
     fun `failed save preserves swap input for retry`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val repository = spyk(InMemoryScheduleRepository())
-        coEvery { repository.postOpenShift(any(), any()) } throws IOException("Disk full")
+        coEvery { repository.postOpenShift(any(), any(), any()) } throws IOException("Disk full")
         val viewModel = viewModel(repository)
         try {
             runCurrent()
@@ -66,7 +66,7 @@ class ScheduleStorageStateTest {
 
     private fun viewModel(repository: InMemoryScheduleRepository) = MainViewModel(
         repository, RequestShiftSwapUseCase(repository),
-        ClaimOpenShiftUseCase(repository, ValidateTradeEligibilityUseCase(repository)),
+        ClaimOpenShiftUseCase(repository),
         GetScheduleInsightsUseCase(repository), SeedData.currentEmployeeId
     )
 }
