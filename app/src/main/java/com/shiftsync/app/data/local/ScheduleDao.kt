@@ -8,6 +8,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ScheduleDao {
+    @Query("SELECT * FROM trade_requests WHERE requesterId = :employeeId OR recipientId = :employeeId ORDER BY createdAt DESC, id")
+    fun observeRequests(employeeId: String): Flow<List<TradeRequestEntity>>
+
+    @Query("SELECT * FROM shifts")
+    fun observeAllShifts(): Flow<List<ShiftEntity>>
+
     @Query("""
         UPDATE trade_requests
         SET status = CASE WHEN recipientId IS NULL THEN 'Accepted' ELSE 'Rejected' END,

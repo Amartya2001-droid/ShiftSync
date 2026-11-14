@@ -15,6 +15,9 @@ import com.shiftsync.app.domain.repository.ScheduleRepository
 import com.shiftsync.app.domain.usecase.CalculateWeeklyScheduleMetricsUseCase
 import com.shiftsync.app.domain.usecase.DraftSwapNoteUseCase
 import com.shiftsync.app.domain.usecase.SummarizeOpenCoverageUseCase
+import com.shiftsync.app.domain.model.RequestHistoryItem
+import com.shiftsync.app.domain.usecase.BuildRequestHistoryUseCase
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant
@@ -45,6 +48,11 @@ class OfflineFirstScheduleRepository(
     override fun observeOpenShifts(): Flow<List<Shift>> {
         return dao.observeOpenShifts().map { entities -> entities.map { it.toDomain() } }
     }
+
+    override fun observeRequestHistory(employeeId: String): Flow<List<RequestHistoryItem>> =
+        combine(dao.observeRequests(employeeId), dao.observeAllShifts(), dao.observeTeam()) { requests, shifts, employees ->
+            BuildRequestHistoryUseCase()(employeeId, requests.map { it.toDomain() }, shifts.map { it.toDomain() }, employees.map { it.toDomain() })
+        }
 
     override fun observeTeam(): Flow<List<Employee>> {
         return dao.observeTeam().map { entities -> entities.map { it.toDomain() } }

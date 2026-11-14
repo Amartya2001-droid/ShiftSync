@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.shiftsync.app.presentation.requests.RequestHistoryScreen
 import com.shiftsync.app.presentation.assistant.AssistantScreen
 import com.shiftsync.app.presentation.calendar.RosterScreen
 import com.shiftsync.app.presentation.marketplace.MarketplaceScreen
@@ -37,7 +38,7 @@ fun ShiftSyncApp(viewModel: MainViewModel) {
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Roster", "Marketplace", "Assistant")
+    val tabs = listOf("Roster", "Marketplace", "Assistant", "Requests")
 
     if (state.isLoading || state.loadError != null) {
         Column(
@@ -106,6 +107,7 @@ fun ShiftSyncApp(viewModel: MainViewModel) {
                 onClaimShift = viewModel::claimShift,
                 modifier = Modifier.padding(padding)
             )
+            3 -> RequestHistoryScreen(state = state, modifier = Modifier.padding(padding))
             2 -> AssistantScreen(
                 state = state,
                 onRefresh = viewModel::refreshInsight,
