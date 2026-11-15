@@ -1,6 +1,7 @@
 package com.shiftsync.app.data.repository
 
 import com.shiftsync.app.domain.model.EligibilityResult
+import com.shiftsync.app.domain.usecase.ValidateTargetedRequestUseCase
 import com.shiftsync.app.domain.usecase.ValidateTradeEligibilityUseCase
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -54,6 +55,7 @@ class InMemoryScheduleRepository : ScheduleRepository {
     override suspend fun postOpenShift(shiftId: String, note: String, requesterId: String): TradeRequest = mutationLock.withLock {
         val shift = shifts.value.first { it.id == shiftId }
         check(shift.employeeId == requesterId) { "Only the current owner can offer this shift." }
+        rejectPendingRequests(shiftId)
         updateShift(shiftId) { it.copy(status = ShiftStatus.UpForGrabs) }
         newRequest(shiftId, null, note, requesterId)
     }
@@ -61,6 +63,10 @@ class InMemoryScheduleRepository : ScheduleRepository {
     override suspend fun requestSwap(shiftId: String, recipientId: String?, note: String, requesterId: String): TradeRequest = mutationLock.withLock {
         val shift = shifts.value.first { it.id == shiftId }
         check(shift.employeeId == requesterId) { "Only the current owner can offer this shift." }
+        check(recipientId != null && recipientId != requesterId && employees.value.any { it.id == recipientId }) {
+            "Choose another existing employee."
+        }
+        rejectPendingRequests(shiftId)
         updateShift(shiftId) { it.copy(status = ShiftStatus.PendingTrade) }
         newRequest(shiftId, recipientId, note, requesterId)
     }
@@ -82,6 +88,28 @@ class InMemoryScheduleRepository : ScheduleRepository {
             } else it
         }
         claimed
+    }
+
+    private fun rejectPendingRequests(shiftId: String) {
+        requests.value = requests.value.map {
+            if (it.shiftId == shiftId && it.status == TradeRequestStatus.Pending) it.copy(status = TradeRequestStatus.Rejected) else it
+        }
+    }
+
+    override suspend fun respondToRequest(requestId: String, employeeId: String, accept: Boolean): TradeRequest = mutationLock.withLock {
+        val request = requests.value.firstOrNull { it.id == requestId } ?: error("Request not found.")
+        val shift = shifts.value.firstOrNull { it.id == request.shiftId } ?: error("Shift not found.")
+        ValidateTargetedRequestUseCase()(request, shift, employeeId)
+        check(employees.value.any { it.id == employeeId }) { "Employee not found." }
+        if (accept) {
+            val eligibility = ValidateTradeEligibilityUseCase(this)(employeeId, shift)
+            check(eligibility == EligibilityResult.Eligible) { (eligibility as EligibilityResult.Ineligible).reason }
+        }
+        val response = request.copy(status = if (accept) TradeRequestStatus.Accepted else TradeRequestStatus.Rejected)
+        updateShift(shift.id) { it.copy(employeeId = if (accept) employeeId else it.employeeId, status = ShiftStatus.Confirmed) }
+        rejectPendingRequests(shift.id)
+        requests.value = requests.value.map { if (it.id == request.id) response else it }
+        response
     }
 
     override suspend fun generateSwapNote(reason: String): String {

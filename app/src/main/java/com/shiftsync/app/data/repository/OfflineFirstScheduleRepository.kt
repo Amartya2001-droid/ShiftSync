@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import com.shiftsync.app.data.local.ShiftSyncDatabase
 import com.shiftsync.app.data.local.toEntity
 import com.shiftsync.app.domain.model.EligibilityResult
+import com.shiftsync.app.domain.usecase.ValidateTargetedRequestUseCase
 import com.shiftsync.app.domain.usecase.ValidateTradeEligibilityUseCase
 import com.shiftsync.app.domain.model.Employee
 import com.shiftsync.app.domain.model.ScheduleInsight
@@ -65,6 +66,7 @@ class OfflineFirstScheduleRepository(
     override suspend fun postOpenShift(shiftId: String, note: String, requesterId: String): TradeRequest = database.withTransaction {
         val shift = dao.shiftById(shiftId)?.toDomain() ?: error("Shift $shiftId not found")
         check(shift.employeeId == requesterId) { "Only the current owner can offer this shift." }
+        dao.rejectPendingRequests(shiftId)
         dao.upsertShift(shift.copy(status = ShiftStatus.UpForGrabs).toEntity())
         createTradeRequest(shiftId, null, note, requesterId)
     }
@@ -72,6 +74,10 @@ class OfflineFirstScheduleRepository(
     override suspend fun requestSwap(shiftId: String, recipientId: String?, note: String, requesterId: String): TradeRequest = database.withTransaction {
         val shift = dao.shiftById(shiftId)?.toDomain() ?: error("Shift $shiftId not found")
         check(shift.employeeId == requesterId) { "Only the current owner can offer this shift." }
+        check(recipientId != null && recipientId != requesterId && dao.employeeById(recipientId) != null) {
+            "Choose another existing employee."
+        }
+        dao.rejectPendingRequests(shiftId)
         dao.upsertShift(shift.copy(status = ShiftStatus.PendingTrade).toEntity())
         createTradeRequest(shiftId, recipientId, note, requesterId)
     }
@@ -89,6 +95,22 @@ class OfflineFirstScheduleRepository(
         dao.upsertShift(claimed.toEntity())
         dao.resolveRequestsForClaim(shiftId, employeeId)
         claimed
+    }
+
+    override suspend fun respondToRequest(requestId: String, employeeId: String, accept: Boolean): TradeRequest = database.withTransaction {
+        val request = dao.requestById(requestId)?.toDomain() ?: error("Request not found.")
+        val shift = dao.shiftById(request.shiftId)?.toDomain() ?: error("Shift not found.")
+        ValidateTargetedRequestUseCase()(request, shift, employeeId)
+        check(dao.employeeById(employeeId) != null) { "Employee not found." }
+        if (accept) {
+            val eligibility = ValidateTradeEligibilityUseCase(this)(employeeId, shift)
+            check(eligibility == EligibilityResult.Eligible) { (eligibility as EligibilityResult.Ineligible).reason }
+        }
+        val response = request.copy(status = if (accept) TradeRequestStatus.Accepted else TradeRequestStatus.Rejected)
+        dao.upsertShift(shift.copy(employeeId = if (accept) employeeId else shift.employeeId, status = ShiftStatus.Confirmed).toEntity())
+        dao.rejectPendingRequests(shift.id)
+        dao.upsertTradeRequest(response.toEntity())
+        response
     }
 
     override suspend fun generateSwapNote(reason: String): String {

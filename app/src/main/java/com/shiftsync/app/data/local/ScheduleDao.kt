@@ -8,6 +8,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ScheduleDao {
+    @Query("SELECT * FROM trade_requests WHERE id = :requestId")
+    suspend fun requestById(requestId: String): TradeRequestEntity?
+
+    @Query("UPDATE trade_requests SET status = 'Rejected' WHERE shiftId = :shiftId AND status = 'Pending'")
+    suspend fun rejectPendingRequests(shiftId: String)
+
     @Query("SELECT * FROM trade_requests WHERE requesterId = :employeeId OR recipientId = :employeeId ORDER BY createdAt DESC, id")
     fun observeRequests(employeeId: String): Flow<List<TradeRequestEntity>>
 

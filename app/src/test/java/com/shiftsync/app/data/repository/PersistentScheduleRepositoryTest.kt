@@ -48,6 +48,94 @@ class PersistentScheduleRepositoryTest {
     }
 
     @Test
+    fun targetedAcceptanceChecksRecipientAndPersistsTransferAfterReopen() = runBlocking<Unit> {
+        repository.initialize()
+        val request = repository.requestSwap("shift-1", "emp-sam", "Exam tomorrow", SeedData.currentEmployeeId)
+        assertTrue(runCatching { repository.respondToRequest(request.id, "emp-jon", true) }.isFailure)
+        assertTrue(runCatching { repository.respondToRequest(request.id, SeedData.currentEmployeeId, true) }.isFailure)
+        assertEquals(SeedData.currentEmployeeId, database.scheduleDao().shiftById("shift-1")!!.employeeId)
+        assertEquals(TradeRequestStatus.Accepted, repository.respondToRequest(request.id, "emp-sam", true).status)
+        assertTrue(runCatching { repository.respondToRequest(request.id, "emp-sam", false) }.isFailure)
+        database.close()
+        openDatabase()
+        repository.initialize()
+        assertEquals("emp-sam", database.scheduleDao().shiftById("shift-1")!!.employeeId)
+        assertEquals(ShiftStatus.Confirmed, database.scheduleDao().shiftById("shift-1")!!.status)
+        val saved = repository.observeRequestHistory("emp-sam").first().single().request
+        assertEquals(TradeRequestStatus.Accepted, saved.status)
+        assertEquals("Exam tomorrow", saved.note)
+        assertFalse(repository.shiftsForEmployee(SeedData.currentEmployeeId).any { it.id == "shift-1" })
+    }
+
+    @Test
+    fun declineRetainsSenderOwnershipAndResolvedRequestCannotBeAccepted() = runBlocking<Unit> {
+        repository.initialize()
+        val request = repository.requestSwap("shift-1", "emp-sam", "Coverage", SeedData.currentEmployeeId)
+        assertEquals(TradeRequestStatus.Rejected, repository.respondToRequest(request.id, "emp-sam", false).status)
+        assertEquals(SeedData.currentEmployeeId, database.scheduleDao().shiftById("shift-1")!!.employeeId)
+        assertEquals(ShiftStatus.Confirmed, database.scheduleDao().shiftById("shift-1")!!.status)
+        assertTrue(runCatching { repository.respondToRequest(request.id, "emp-sam", true) }.isFailure)
+    }
+
+    @Test
+    fun ineligibleAcceptancePreservesPendingOfferButDeclineStillWorks() = runBlocking<Unit> {
+        repository.initialize()
+        val request = repository.requestSwap("shift-1", "emp-sam", "Coverage", SeedData.currentEmployeeId)
+        val offered = database.scheduleDao().shiftById("shift-1")!!
+        database.scheduleDao().upsertShift(offered.copy(id = "conflict", employeeId = "emp-sam", status = ShiftStatus.Confirmed))
+        assertTrue(runCatching { repository.respondToRequest(request.id, "emp-sam", true) }.exceptionOrNull()!!.message!!.contains("overlaps"))
+        assertEquals(offered, database.scheduleDao().shiftById("shift-1"))
+        assertEquals(TradeRequestStatus.Pending, database.scheduleDao().requestById(request.id)!!.status)
+        assertEquals(TradeRequestStatus.Rejected, repository.respondToRequest(request.id, "emp-sam", false).status)
+    }
+
+    @Test
+    fun newOffersSupersedeOldRequestsAndStaleOwnerCannotTransfer() = runBlocking<Unit> {
+        repository.initialize()
+        val old = repository.requestSwap("shift-1", "emp-sam", "First", SeedData.currentEmployeeId)
+        assertTrue(runCatching { repository.requestSwap("shift-1", "missing", "Invalid", SeedData.currentEmployeeId) }.isFailure)
+        assertEquals(TradeRequestStatus.Pending, database.scheduleDao().requestById(old.id)!!.status)
+        repository.postOpenShift("shift-1", "Open board", SeedData.currentEmployeeId)
+        assertEquals(TradeRequestStatus.Rejected, database.scheduleDao().requestById(old.id)!!.status)
+        assertTrue(runCatching { repository.respondToRequest(old.id, "emp-sam", true) }.isFailure)
+        val fresh = repository.requestSwap("shift-1", "emp-sam", "New offer", SeedData.currentEmployeeId)
+        val shift = database.scheduleDao().shiftById("shift-1")!!
+        database.scheduleDao().upsertShift(shift.copy(employeeId = "emp-jon"))
+        assertTrue(runCatching { repository.respondToRequest(fresh.id, "emp-sam", true) }.isFailure)
+        assertEquals("emp-jon", database.scheduleDao().shiftById("shift-1")!!.employeeId)
+        assertEquals(TradeRequestStatus.Pending, database.scheduleDao().requestById(fresh.id)!!.status)
+    }
+
+    @Test
+    fun competingAcceptAndDeclineResolveExactlyOnce() = runBlocking<Unit> {
+        repository.initialize()
+        val request = repository.requestSwap("shift-1", "emp-sam", "Coverage", SeedData.currentEmployeeId)
+        val results = coroutineScope {
+            val a = async { runCatching { repository.respondToRequest(request.id, "emp-sam", true) } }
+            val b = async { runCatching { repository.respondToRequest(request.id, "emp-sam", false) } }
+            listOf(a.await(), b.await())
+        }
+        assertEquals(1, results.count { it.isSuccess })
+        val status = results.single { it.isSuccess }.getOrThrow().status
+        assertEquals(status, database.scheduleDao().requestById(request.id)!!.status)
+        assertEquals(if (status == TradeRequestStatus.Accepted) "emp-sam" else SeedData.currentEmployeeId,
+            database.scheduleDao().shiftById("shift-1")!!.employeeId)
+    }
+
+    @Test
+    fun responseWriteFailureRollsBackOwnerAndStatus() = runBlocking<Unit> {
+        repository.initialize()
+        val request = repository.requestSwap("shift-1", "emp-sam", "Coverage", SeedData.currentEmployeeId)
+        database.openHelper.writableDatabase.execSQL(
+            "CREATE TRIGGER reject_response BEFORE UPDATE ON trade_requests BEGIN SELECT RAISE(ABORT, 'test failure'); END"
+        )
+        assertTrue(runCatching { repository.respondToRequest(request.id, "emp-sam", true) }.isFailure)
+        assertEquals(SeedData.currentEmployeeId, database.scheduleDao().shiftById("shift-1")!!.employeeId)
+        assertEquals(ShiftStatus.PendingTrade, database.scheduleDao().shiftById("shift-1")!!.status)
+        assertEquals(TradeRequestStatus.Pending, database.scheduleDao().requestById(request.id)!!.status)
+    }
+
+    @Test
     fun postedShiftTransfersOwnershipAndResolvesRequestsAcrossReopen() = runBlocking<Unit> {
         repository.initialize()
         val targeted = repository.requestSwap("shift-1", "emp-jon", "Can you cover?", SeedData.currentEmployeeId)
