@@ -24,7 +24,7 @@ Use this checklist when walking a reviewer through the project.
 ## Technical Talking Points
 
 - Conflict prevention is implemented in `ValidateTradeEligibilityUseCase` and checked inside the repository ownership-transfer transaction. Competing claims recheck saved availability and the claimant’s latest schedule.
-- Pending open-board requests become Accepted when a claim succeeds; superseded targeted requests become Rejected. Request history and targeted acceptance UI are not implemented yet.
+- Pending open-board requests become Accepted when a claim succeeds; superseded targeted requests become Rejected. The Requests tab displays participant-scoped history and status; targeted acceptance UI is not implemented yet.
 - Weekly hour and earnings metrics are centralized in `CalculateWeeklyScheduleMetricsUseCase`.
 - `ScheduleRepository` keeps presentation code independent from Room, Retrofit, and AI service details.
 - `OfflineFirstScheduleRepository` persists the usable local sample without backend credentials.
@@ -37,3 +37,9 @@ Use this checklist when walking a reviewer through the project.
 - Compose UI test coverage verifies the swap request dialog flow.
 - GitHub Actions validates project structure, builds the APK, executes JVM tests including file-backed Room/Robolectric persistence tests, and compiles instrumentation tests.
 - Device instrumentation and the manual lifecycle walkthrough must be reported separately from JVM results.
+
+## Request History
+
+- Send a targeted request as Maya, switch to its recipient, and open Requests: confirm the sender, note, shift, and Pending status.
+- Unrelated demo employees should not see the request.
+- Claim an open-board post and check that the saved Accepted status is visible to both participants after relaunch.

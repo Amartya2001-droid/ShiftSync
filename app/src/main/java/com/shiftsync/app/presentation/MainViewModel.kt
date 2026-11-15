@@ -3,6 +3,7 @@ package com.shiftsync.app.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.shiftsync.app.domain.model.RequestHistoryItem
 import com.shiftsync.app.domain.model.Employee
 import com.shiftsync.app.domain.model.ScheduleInsight
 import com.shiftsync.app.domain.model.Shift
@@ -55,9 +56,10 @@ class MainViewModel(
                 combine(
                     repository.observeMyShifts(activeEmployeeId),
                     repository.observeOpenShifts(),
-                    repository.observeTeam()
-                ) { myShifts, openShifts, team ->
-                    ScheduleUiState(currentEmployeeId = activeEmployeeId, myShifts = myShifts, openShifts = openShifts, team = team)
+                    repository.observeTeam(),
+                    repository.observeRequestHistory(activeEmployeeId)
+                ) { myShifts, openShifts, team, requestHistory ->
+                    ScheduleUiState(currentEmployeeId = activeEmployeeId, myShifts = myShifts, openShifts = openShifts, team = team, requestHistory = requestHistory)
                 }.collect { nextState ->
                     mutableState.update {
                         nextState.copy(
@@ -179,6 +181,7 @@ data class ScheduleUiState(
     val isSavingSwap: Boolean = false,
     val isLoading: Boolean = false,
     val loadError: String? = null,
+    val requestHistory: List<RequestHistoryItem> = emptyList(),
     val myShifts: List<Shift> = emptyList(),
     val openShifts: List<Shift> = emptyList(),
     val team: List<Employee> = emptyList(),

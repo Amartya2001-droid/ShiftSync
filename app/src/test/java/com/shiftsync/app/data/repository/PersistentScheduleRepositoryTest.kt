@@ -65,6 +65,9 @@ class PersistentScheduleRepositoryTest {
         assertTrue(repository.shiftsForEmployee("emp-sam").any { it.id == "shift-1" })
         assertFalse(repository.observeOpenShifts().first().any { it.id == "shift-1" })
         val requests = database.scheduleDao().tradeRequests().associateBy { it.id }
+        assertEquals(2, repository.observeRequestHistory(SeedData.currentEmployeeId).first().size)
+        assertEquals(TradeRequestStatus.Accepted, repository.observeRequestHistory("emp-sam").first().single().request.status)
+        assertTrue(repository.observeRequestHistory("emp-lina").first().isEmpty())
         assertEquals(TradeRequestStatus.Accepted, requests[posted.id]!!.status)
         assertEquals("emp-sam", requests[posted.id]!!.recipientId)
         assertEquals(TradeRequestStatus.Rejected, requests[targeted.id]!!.status)

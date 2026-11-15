@@ -1,5 +1,6 @@
 package com.shiftsync.app.domain.repository
 
+import com.shiftsync.app.domain.model.RequestHistoryItem
 import com.shiftsync.app.domain.model.Employee
 import com.shiftsync.app.domain.model.ScheduleInsight
 import com.shiftsync.app.domain.model.Shift
@@ -10,6 +11,7 @@ interface ScheduleRepository {
     suspend fun initialize() {}
     fun observeMyShifts(employeeId: String): Flow<List<Shift>>
     fun observeOpenShifts(): Flow<List<Shift>>
+    fun observeRequestHistory(employeeId: String): Flow<List<RequestHistoryItem>>
     fun observeTeam(): Flow<List<Employee>>
     suspend fun shiftsForEmployee(employeeId: String): List<Shift>
     suspend fun postOpenShift(shiftId: String, note: String, requesterId: String): TradeRequest

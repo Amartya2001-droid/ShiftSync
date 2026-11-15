@@ -14,6 +14,9 @@ import com.shiftsync.app.domain.repository.ScheduleRepository
 import com.shiftsync.app.domain.usecase.CalculateWeeklyScheduleMetricsUseCase
 import com.shiftsync.app.domain.usecase.DraftSwapNoteUseCase
 import com.shiftsync.app.domain.usecase.SummarizeOpenCoverageUseCase
+import com.shiftsync.app.domain.model.RequestHistoryItem
+import com.shiftsync.app.domain.usecase.BuildRequestHistoryUseCase
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -22,7 +25,7 @@ import java.util.UUID
 
 class InMemoryScheduleRepository : ScheduleRepository {
     private val mutationLock = Mutex()
-    private var requests = emptyList<TradeRequest>()
+    private val requests = MutableStateFlow(emptyList<TradeRequest>())
     private val shifts = MutableStateFlow(SeedData.shifts())
     private val employees = MutableStateFlow(SeedData.employees)
     private val calculateWeeklyScheduleMetrics = CalculateWeeklyScheduleMetricsUseCase()
@@ -36,6 +39,11 @@ class InMemoryScheduleRepository : ScheduleRepository {
     override fun observeOpenShifts(): Flow<List<Shift>> {
         return shifts.map { items -> items.filter { it.status == ShiftStatus.UpForGrabs }.sortedBy { it.startsAt } }
     }
+
+    override fun observeRequestHistory(employeeId: String): Flow<List<RequestHistoryItem>> =
+        combine(requests, shifts, employees) { requests, shifts, employees ->
+            BuildRequestHistoryUseCase()(employeeId, requests, shifts, employees)
+        }
 
     override fun observeTeam(): Flow<List<Employee>> = employees
 
@@ -67,7 +75,7 @@ class InMemoryScheduleRepository : ScheduleRepository {
             (eligibility as EligibilityResult.Ineligible).reason
         }
         val claimed = updateShift(shiftId) { it.copy(employeeId = employeeId, status = ShiftStatus.Confirmed) }
-        requests = requests.map {
+        requests.value = requests.value.map {
             if (it.shiftId == shiftId && it.status == TradeRequestStatus.Pending) {
                 if (it.recipientId == null) it.copy(status = TradeRequestStatus.Accepted, recipientId = employeeId)
                 else it.copy(status = TradeRequestStatus.Rejected)
@@ -114,7 +122,7 @@ class InMemoryScheduleRepository : ScheduleRepository {
             status = TradeRequestStatus.Pending,
             createdAt = Instant.now()
         )
-        requests = requests + request
+        requests.value = requests.value + request
         return request
     }
 
