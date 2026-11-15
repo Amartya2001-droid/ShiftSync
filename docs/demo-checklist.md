@@ -45,3 +45,11 @@ Use this checklist when walking a reviewer through the project.
 - Sending a new offer for the same shift supersedes earlier pending offers.
 - Unrelated demo employees should not see the request or be able to respond.
 - Claim an open-board post and check that the saved Accepted status is visible to both participants after relaunch.
+
+## Withdraw an Offer
+
+- As Maya, send Sam a targeted offer; in Requests, choose Withdraw offer and confirm. Both histories should show Cancelled and Maya should retain the Confirmed shift. Sam can no longer accept.
+- Post a shift to the open board, withdraw it, and confirm it disappears from Marketplace while the roster/hours remain with Maya. Coverage gaps should refresh.
+- Keep offer in the confirmation dialog should leave the request unchanged.
+- Try a stale withdrawal after acceptance/claim: it must fail without reversing ownership.
+- This walkthrough still requires real-device verification; CI JVM/Robolectric results are reported separately.

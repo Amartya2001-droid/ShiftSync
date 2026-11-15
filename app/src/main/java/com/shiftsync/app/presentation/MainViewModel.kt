@@ -8,6 +8,7 @@ import com.shiftsync.app.domain.model.Employee
 import com.shiftsync.app.domain.model.ScheduleInsight
 import com.shiftsync.app.domain.model.Shift
 import com.shiftsync.app.domain.repository.ScheduleRepository
+import com.shiftsync.app.domain.usecase.CancelRequestUseCase
 import com.shiftsync.app.domain.usecase.ClaimOpenShiftUseCase
 import com.shiftsync.app.domain.usecase.GetScheduleInsightsUseCase
 import com.shiftsync.app.domain.usecase.RespondToRequestUseCase
@@ -64,6 +65,7 @@ class MainViewModel(
                 }.collect { nextState ->
                     mutableState.update {
                         nextState.copy(
+                            cancellingRequestId = it.cancellingRequestId,
                             respondingRequestId = it.respondingRequestId,
                             claimingShiftId = it.claimingShiftId,
                             isSavingSwap = it.isSavingSwap,
@@ -157,6 +159,23 @@ class MainViewModel(
         }
     }
 
+    fun cancelRequest(requestId: String) {
+        if (state.value.isBusy || state.value.isLoading) return
+        val actorId = employeeId
+        mutableState.update { it.copy(cancellingRequestId = requestId) }
+        viewModelScope.launch {
+            try {
+                val result = CancelRequestUseCase(repository)(requestId, actorId)
+                mutableState.update { it.copy(snackbarMessage = result.fold(
+                    onSuccess = { "Offer withdrawn" },
+                    onFailure = { it.message ?: "Unable to withdraw offer. Please retry." }
+                )) }
+            } finally {
+                mutableState.update { it.copy(cancellingRequestId = null) }
+            }
+        }
+    }
+
     fun respondToRequest(requestId: String, accept: Boolean) {
         if (state.value.isBusy || state.value.isLoading) return
         val actorId = employeeId
@@ -196,6 +215,7 @@ class MainViewModel(
 
 data class ScheduleUiState(
     val currentEmployeeId: String = "",
+    val cancellingRequestId: String? = null,
     val respondingRequestId: String? = null,
     val claimingShiftId: String? = null,
     val isSavingSwap: Boolean = false,
@@ -211,7 +231,7 @@ data class ScheduleUiState(
     val insight: ScheduleInsight? = null,
     val snackbarMessage: String? = null
 ) {
-    val isBusy: Boolean get() = claimingShiftId != null || isSavingSwap || respondingRequestId != null
+    val isBusy: Boolean get() = claimingShiftId != null || isSavingSwap || respondingRequestId != null || cancellingRequestId != null
 }
 
 class MainViewModelFactory(

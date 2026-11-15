@@ -48,6 +48,92 @@ class PersistentScheduleRepositoryTest {
     }
 
     @Test
+    fun cancellationPersistsForBothKindsOfOfferWithoutChangingOwnership() = runBlocking<Unit> {
+        repository.initialize()
+        val targeted = repository.requestSwap("shift-1", "emp-sam", "Targeted note", SeedData.currentEmployeeId)
+        val posted = repository.postOpenShift("shift-3", "Open note", SeedData.currentEmployeeId)
+        repository.cancelRequest(targeted.id, SeedData.currentEmployeeId)
+        repository.cancelRequest(posted.id, SeedData.currentEmployeeId)
+        database.close()
+        openDatabase()
+        repository.initialize()
+        for (id in listOf("shift-1", "shift-3")) {
+            val shift = database.scheduleDao().shiftById(id)!!
+            assertEquals(SeedData.currentEmployeeId, shift.employeeId)
+            assertEquals(ShiftStatus.Confirmed, shift.status)
+            assertFalse(repository.observeOpenShifts().first().any { it.id == id })
+        }
+        val history = repository.observeRequestHistory(SeedData.currentEmployeeId).first()
+        assertEquals(2, history.size)
+        assertTrue(history.all { it.request.status == TradeRequestStatus.Cancelled })
+        assertEquals("Targeted note", repository.observeRequestHistory("emp-sam").first().single().request.note)
+        assertEquals(TradeRequestStatus.Cancelled, repository.observeRequestHistory("emp-sam").first().single().request.status)
+        assertTrue(runCatching { repository.respondToRequest(targeted.id, "emp-sam", true) }.isFailure)
+        assertTrue(runCatching { repository.cancelRequest(posted.id, SeedData.currentEmployeeId) }.isFailure)
+    }
+
+    @Test
+    fun unauthorizedSupersededAndTransferredOffersCannotBeCancelled() = runBlocking<Unit> {
+        repository.initialize()
+        val old = repository.requestSwap("shift-1", "emp-sam", "Coverage", SeedData.currentEmployeeId)
+        assertTrue(runCatching { repository.cancelRequest(old.id, "emp-sam") }.isFailure)
+        assertTrue(runCatching { repository.cancelRequest(old.id, "missing") }.isFailure)
+        assertEquals(TradeRequestStatus.Pending, database.scheduleDao().requestById(old.id)!!.status)
+        val current = repository.postOpenShift("shift-1", "New offer", SeedData.currentEmployeeId)
+        assertTrue(runCatching { repository.cancelRequest(old.id, SeedData.currentEmployeeId) }.isFailure)
+        assertEquals(TradeRequestStatus.Pending, database.scheduleDao().requestById(current.id)!!.status)
+        repository.claimOpenShift("shift-1", "emp-sam")
+        assertTrue(runCatching { repository.cancelRequest(current.id, SeedData.currentEmployeeId) }.isFailure)
+        assertEquals("emp-sam", database.scheduleDao().shiftById("shift-1")!!.employeeId)
+        assertEquals(TradeRequestStatus.Accepted, database.scheduleDao().requestById(current.id)!!.status)
+    }
+
+    @Test
+    fun cancellationAndAcceptanceHaveOneAtomicWinner() = runBlocking<Unit> {
+        repository.initialize()
+        val request = repository.requestSwap("shift-1", "emp-sam", "Coverage", SeedData.currentEmployeeId)
+        val results = coroutineScope {
+            val a = async { runCatching { repository.cancelRequest(request.id, SeedData.currentEmployeeId) } }
+            val b = async { runCatching { repository.respondToRequest(request.id, "emp-sam", true) } }
+            listOf(a.await(), b.await())
+        }
+        assertEquals(1, results.count { it.isSuccess })
+        val status = results.single { it.isSuccess }.getOrThrow().status
+        assertEquals(status, database.scheduleDao().requestById(request.id)!!.status)
+        assertEquals(if (status == TradeRequestStatus.Accepted) "emp-sam" else SeedData.currentEmployeeId,
+            database.scheduleDao().shiftById("shift-1")!!.employeeId)
+        assertEquals(ShiftStatus.Confirmed, database.scheduleDao().shiftById("shift-1")!!.status)
+    }
+
+    @Test
+    fun cancellationAndMarketplaceClaimHaveOneAtomicWinner() = runBlocking<Unit> {
+        repository.initialize()
+        val request = repository.postOpenShift("shift-1", "Coverage", SeedData.currentEmployeeId)
+        val results = coroutineScope {
+            val cancel = async { runCatching { repository.cancelRequest(request.id, SeedData.currentEmployeeId) }.isSuccess }
+            val claim = async { runCatching { repository.claimOpenShift("shift-1", "emp-sam") }.isSuccess }
+            listOf(cancel.await(), claim.await())
+        }
+        assertEquals(1, results.count { it })
+        val saved = database.scheduleDao().requestById(request.id)!!
+        assertEquals(if (results.first()) TradeRequestStatus.Cancelled else TradeRequestStatus.Accepted, saved.status)
+        assertEquals(if (results.first()) SeedData.currentEmployeeId else "emp-sam", database.scheduleDao().shiftById("shift-1")!!.employeeId)
+    }
+
+    @Test
+    fun failedCancellationWriteRollsBackShiftAndRequest() = runBlocking<Unit> {
+        repository.initialize()
+        val request = repository.postOpenShift("shift-1", "Coverage", SeedData.currentEmployeeId)
+        database.openHelper.writableDatabase.execSQL(
+            "CREATE TRIGGER reject_cancellation BEFORE UPDATE ON trade_requests BEGIN SELECT RAISE(ABORT, 'test failure'); END"
+        )
+        assertTrue(runCatching { repository.cancelRequest(request.id, SeedData.currentEmployeeId) }.isFailure)
+        assertEquals(ShiftStatus.UpForGrabs, database.scheduleDao().shiftById("shift-1")!!.status)
+        assertEquals(SeedData.currentEmployeeId, database.scheduleDao().shiftById("shift-1")!!.employeeId)
+        assertEquals(TradeRequestStatus.Pending, database.scheduleDao().requestById(request.id)!!.status)
+    }
+
+    @Test
     fun targetedAcceptanceChecksRecipientAndPersistsTransferAfterReopen() = runBlocking<Unit> {
         repository.initialize()
         val request = repository.requestSwap("shift-1", "emp-sam", "Exam tomorrow", SeedData.currentEmployeeId)
