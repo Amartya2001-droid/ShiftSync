@@ -48,6 +48,29 @@ class PersistentScheduleRepositoryTest {
     }
 
     @Test
+    fun requestViewsReflectPersistedResolutionAfterReopen() = runBlocking<Unit> {
+        repository.initialize()
+        val sender = SeedData.currentEmployeeId
+        val accepted = repository.requestSwap("shift-1", "emp-sam", "Accepted note", sender)
+        repository.respondToRequest(accepted.id, "emp-sam", true)
+        val cancelled = repository.requestSwap("shift-3", "emp-sam", "Cancelled note", sender)
+        repository.cancelRequest(cancelled.id, sender)
+        repository.requestSwap("shift-2", "emp-sam", "Pending note", sender)
+        database.close()
+        openDatabase()
+        repository.initialize()
+        val history = repository.observeRequestHistory("emp-sam").first()
+        val filter = com.shiftsync.app.domain.usecase.FilterRequestHistoryUseCase()
+        val pending = filter("emp-sam", history, com.shiftsync.app.domain.model.RequestHistoryFilter.NeedsResponse)
+        assertEquals(listOf("Pending note"), pending.items.map { it.request.note })
+        val resolved = filter("emp-sam", history, com.shiftsync.app.domain.model.RequestHistoryFilter.Resolved)
+        assertEquals(setOf(TradeRequestStatus.Accepted, TradeRequestStatus.Cancelled), resolved.items.map { it.request.status }.toSet())
+        assertEquals(3, pending.counts.getValue(com.shiftsync.app.domain.model.RequestHistoryFilter.All))
+        assertEquals(0, pending.counts.getValue(com.shiftsync.app.domain.model.RequestHistoryFilter.Sent))
+        assertTrue(filter("emp-lina", history, com.shiftsync.app.domain.model.RequestHistoryFilter.All).items.isEmpty())
+    }
+
+    @Test
     fun cancellationPersistsForBothKindsOfOfferWithoutChangingOwnership() = runBlocking<Unit> {
         repository.initialize()
         val targeted = repository.requestSwap("shift-1", "emp-sam", "Targeted note", SeedData.currentEmployeeId)

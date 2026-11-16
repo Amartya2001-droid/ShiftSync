@@ -53,3 +53,11 @@ Use this checklist when walking a reviewer through the project.
 - Keep offer in the confirmation dialog should leave the request unchanged.
 - Try a stale withdrawal after acceptance/claim: it must fail without reversing ownership.
 - This walkthrough still requires real-device verification; CI JVM/Robolectric results are reported separately.
+
+## Request Views
+
+- Create a targeted request as Maya, switch to Sam, and choose To respond: only incoming pending offers should appear.
+- Accept or decline an offer: it should leave To respond and remain in Resolved with its note/status. Sender withdrawal should likewise move it to Resolved as Cancelled.
+- Sent should include the selected employee’s own pending and resolved offers; All keeps both directions in newest-first order.
+- Counts should reflect the selected employee’s saved history. Change demo employee and confirm the view resets to All.
+- On a narrow device, scroll the filter controls horizontally. Empty views should explain what belongs there. Device rendering/taps remain unverified until a device/emulator walkthrough is run.
