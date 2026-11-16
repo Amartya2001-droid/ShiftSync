@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import com.shiftsync.app.data.local.ShiftSyncDatabase
 import com.shiftsync.app.data.local.toEntity
 import com.shiftsync.app.domain.model.EligibilityResult
+import com.shiftsync.app.domain.usecase.ValidateRequestCancellationUseCase
 import com.shiftsync.app.domain.usecase.ValidateTargetedRequestUseCase
 import com.shiftsync.app.domain.usecase.ValidateTradeEligibilityUseCase
 import com.shiftsync.app.domain.model.Employee
@@ -95,6 +96,18 @@ class OfflineFirstScheduleRepository(
         dao.upsertShift(claimed.toEntity())
         dao.resolveRequestsForClaim(shiftId, employeeId)
         claimed
+    }
+
+    override suspend fun cancelRequest(requestId: String, employeeId: String): TradeRequest = database.withTransaction {
+        val request = dao.requestById(requestId)?.toDomain() ?: error("Request not found.")
+        val shift = dao.shiftById(request.shiftId)?.toDomain() ?: error("Shift not found.")
+        ValidateRequestCancellationUseCase()(request, shift, employeeId)
+        check(dao.employeeById(employeeId) != null) { "Employee not found." }
+        val cancelled = request.copy(status = TradeRequestStatus.Cancelled)
+        dao.upsertShift(shift.copy(status = ShiftStatus.Confirmed).toEntity())
+        dao.rejectPendingRequests(shift.id)
+        dao.upsertTradeRequest(cancelled.toEntity())
+        cancelled
     }
 
     override suspend fun respondToRequest(requestId: String, employeeId: String, accept: Boolean): TradeRequest = database.withTransaction {

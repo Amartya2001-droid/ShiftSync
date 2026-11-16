@@ -1,6 +1,7 @@
 package com.shiftsync.app.data.repository
 
 import com.shiftsync.app.domain.model.EligibilityResult
+import com.shiftsync.app.domain.usecase.ValidateRequestCancellationUseCase
 import com.shiftsync.app.domain.usecase.ValidateTargetedRequestUseCase
 import com.shiftsync.app.domain.usecase.ValidateTradeEligibilityUseCase
 import kotlinx.coroutines.sync.Mutex
@@ -94,6 +95,18 @@ class InMemoryScheduleRepository : ScheduleRepository {
         requests.value = requests.value.map {
             if (it.shiftId == shiftId && it.status == TradeRequestStatus.Pending) it.copy(status = TradeRequestStatus.Rejected) else it
         }
+    }
+
+    override suspend fun cancelRequest(requestId: String, employeeId: String): TradeRequest = mutationLock.withLock {
+        val request = requests.value.firstOrNull { it.id == requestId } ?: error("Request not found.")
+        val shift = shifts.value.firstOrNull { it.id == request.shiftId } ?: error("Shift not found.")
+        ValidateRequestCancellationUseCase()(request, shift, employeeId)
+        check(employees.value.any { it.id == employeeId }) { "Employee not found." }
+        val cancelled = request.copy(status = TradeRequestStatus.Cancelled)
+        updateShift(shift.id) { it.copy(status = ShiftStatus.Confirmed) }
+        rejectPendingRequests(shift.id)
+        requests.value = requests.value.map { if (it.id == request.id) cancelled else it }
+        cancelled
     }
 
     override suspend fun respondToRequest(requestId: String, employeeId: String, accept: Boolean): TradeRequest = mutationLock.withLock {

@@ -15,5 +15,6 @@ data class TradeRequest(
 enum class TradeRequestStatus {
     Pending,
     Accepted,
-    Rejected
+    Rejected,
+    Cancelled
 }

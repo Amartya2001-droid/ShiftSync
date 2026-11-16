@@ -18,6 +18,7 @@ interface ScheduleRepository {
     suspend fun requestSwap(shiftId: String, recipientId: String?, note: String, requesterId: String): TradeRequest
     // Must validate the current owner, availability and eligibility atomically with the transfer.
     suspend fun claimOpenShift(shiftId: String, employeeId: String): Shift
+    suspend fun cancelRequest(requestId: String, employeeId: String): TradeRequest
     suspend fun respondToRequest(requestId: String, employeeId: String, accept: Boolean): TradeRequest
     suspend fun generateSwapNote(reason: String): String
     suspend fun generateScheduleInsight(employeeId: String): ScheduleInsight
