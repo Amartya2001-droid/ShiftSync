@@ -68,7 +68,7 @@ class MainViewModel(
                     mutableState.update {
                         nextState.copy(
                             responseConfirmation = it.responseConfirmation?.takeIf { prompt ->
-                                requestHistory.any { current -> current == prompt.item && canConfirmResponse(current, activeEmployeeId) }
+                                nextState.requestHistory.any { current -> current == prompt.item && canConfirmResponse(current, activeEmployeeId) }
                             },
                             cancellingRequestId = it.cancellingRequestId,
                             respondingRequestId = it.respondingRequestId,
