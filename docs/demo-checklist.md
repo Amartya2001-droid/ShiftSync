@@ -61,3 +61,11 @@ Use this checklist when walking a reviewer through the project.
 - Sent should include the selected employee’s own pending and resolved offers; All keeps both directions in newest-first order.
 - Counts should reflect the selected employee’s saved history. Change demo employee and confirm the view resets to All.
 - On a narrow device, scroll the filter controls horizontally. Empty views should explain what belongs there. Device rendering/taps remain unverified until a device/emulator walkthrough is run.
+
+## Confirm a Targeted Response
+
+- As Sam, tap Accept on an incoming pending request: inspect the sender, shift/time, note, and responsibility message. Choose Go back and verify it remains Pending with Maya.
+- Reopen and confirm Accept shift: verify one transfer and Accepted status in both histories.
+- Repeat with Decline: Go back must preserve Pending; Decline request must retain Maya’s shift and mark Rejected.
+- Withdraw the offer from another participant view while a response prompt is open: the stale prompt must disappear. Changing demo employee must also dismiss it.
+- Device dialog rendering/taps remain unverified; JVM tests exercise the ViewModel confirmation flow.
