@@ -107,7 +107,7 @@ fun ShiftSyncApp(viewModel: MainViewModel) {
                 onClaimShift = viewModel::claimShift,
                 modifier = Modifier.padding(padding)
             )
-            3 -> RequestHistoryScreen(state = state, onRespond = viewModel::respondToRequest, onCancel = viewModel::cancelRequest, modifier = Modifier.padding(padding))
+            3 -> RequestHistoryScreen(state = state, onRespond = viewModel::requestResponseConfirmation, onCancel = viewModel::cancelRequest, onConfirmResponse = viewModel::confirmRequestResponse, onDismissResponse = viewModel::dismissResponseConfirmation, modifier = Modifier.padding(padding))
             2 -> AssistantScreen(
                 state = state,
                 onRefresh = viewModel::refreshInsight,

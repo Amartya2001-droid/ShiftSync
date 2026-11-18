@@ -3,6 +3,8 @@ package com.shiftsync.app.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.shiftsync.app.domain.model.ShiftStatus
+import com.shiftsync.app.domain.model.TradeRequestStatus
 import com.shiftsync.app.domain.model.RequestHistoryItem
 import com.shiftsync.app.domain.model.Employee
 import com.shiftsync.app.domain.model.ScheduleInsight
@@ -65,6 +67,9 @@ class MainViewModel(
                 }.collect { nextState ->
                     mutableState.update {
                         nextState.copy(
+                            responseConfirmation = it.responseConfirmation?.takeIf { prompt ->
+                                nextState.requestHistory.any { current -> current == prompt.item && canConfirmResponse(current, activeEmployeeId) }
+                            },
                             cancellingRequestId = it.cancellingRequestId,
                             respondingRequestId = it.respondingRequestId,
                             claimingShiftId = it.claimingShiftId,
@@ -176,10 +181,44 @@ class MainViewModel(
         }
     }
 
+    private fun canConfirmResponse(item: RequestHistoryItem, actorId: String): Boolean {
+        val shift = item.shift ?: return false
+        return item.request.status == TradeRequestStatus.Pending && item.request.recipientId == actorId &&
+            item.request.requesterId != actorId && shift.employeeId == item.request.requesterId &&
+            shift.status == ShiftStatus.PendingTrade
+    }
+
+    fun requestResponseConfirmation(requestId: String, accept: Boolean) {
+        if (state.value.isBusy || state.value.isLoading) return
+        val item = state.value.requestHistory.firstOrNull { it.request.id == requestId }
+        if (item == null || !canConfirmResponse(item, employeeId)) {
+            mutableState.update { it.copy(responseConfirmation = null, snackbarMessage = "This request is no longer available to respond to.") }
+            return
+        }
+        mutableState.update { it.copy(responseConfirmation = RequestResponseConfirmation(item, accept)) }
+    }
+
+    fun dismissResponseConfirmation() {
+        mutableState.update { it.copy(responseConfirmation = null) }
+    }
+
+    fun confirmRequestResponse() {
+        if (state.value.isBusy || state.value.isLoading) return
+        val prompt = state.value.responseConfirmation ?: return
+        val current = state.value.requestHistory.firstOrNull { it.request.id == prompt.item.request.id }
+        mutableState.update { it.copy(responseConfirmation = null) }
+        if (current == null || current != prompt.item || !canConfirmResponse(current, employeeId)) {
+            mutableState.update { it.copy(snackbarMessage = "This request changed. Review it before responding.") }
+            return
+        }
+        // This is only a UI guard; repository validation still occurs inside the write transaction.
+        respondToRequest(current.request.id, prompt.accept)
+    }
+
     fun respondToRequest(requestId: String, accept: Boolean) {
         if (state.value.isBusy || state.value.isLoading) return
         val actorId = employeeId
-        mutableState.update { it.copy(respondingRequestId = requestId) }
+        mutableState.update { it.copy(respondingRequestId = requestId, responseConfirmation = null) }
         viewModelScope.launch {
             try {
                 val result = RespondToRequestUseCase(repository)(requestId, actorId, accept)
@@ -214,6 +253,7 @@ class MainViewModel(
 }
 
 data class ScheduleUiState(
+    val responseConfirmation: RequestResponseConfirmation? = null,
     val currentEmployeeId: String = "",
     val cancellingRequestId: String? = null,
     val respondingRequestId: String? = null,

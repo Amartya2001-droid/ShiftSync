@@ -20,7 +20,30 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun RequestHistoryScreen(state: ScheduleUiState, onRespond: (String, Boolean) -> Unit, onCancel: (String) -> Unit, modifier: Modifier = Modifier) {
+fun RequestHistoryScreen(state: ScheduleUiState, onRespond: (String, Boolean) -> Unit, onCancel: (String) -> Unit, onConfirmResponse: () -> Unit, onDismissResponse: () -> Unit, modifier: Modifier = Modifier) {
+    val responsePrompt = state.responseConfirmation
+    if (responsePrompt != null) {
+        AlertDialog(
+            onDismissRequest = onDismissResponse,
+            title = { Text(if (responsePrompt.accept) "Accept this shift?" else "Decline this request?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(responsePrompt.item.shift?.section ?: "Shift unavailable")
+                    responsePrompt.item.shift?.let { Text(ShiftTimeFormatter.fullRange(it)) }
+                    Text("From ${responsePrompt.item.requesterName}")
+                    if (responsePrompt.item.request.note.isNotBlank()) Text(responsePrompt.item.request.note)
+                    Text(if (responsePrompt.accept) "You'll take responsibility for this shift. Schedule eligibility is checked when you confirm."
+                        else "No transfer will occur. ${responsePrompt.item.requesterName} keeps the shift.")
+                }
+            },
+            confirmButton = {
+                Button(onClick = onConfirmResponse, enabled = !state.isBusy) {
+                    Text(if (responsePrompt.accept) "Accept shift" else "Decline request")
+                }
+            },
+            dismissButton = { TextButton(onClick = onDismissResponse) { Text("Go back") } }
+        )
+    }
     var selectedFilterName by rememberSaveable(state.currentEmployeeId) { mutableStateOf(RequestHistoryFilter.All.name) }
     val selectedFilter = RequestHistoryFilter.valueOf(selectedFilterName)
     val filtered = FilterRequestHistoryUseCase()(state.currentEmployeeId, state.requestHistory, selectedFilter)
