@@ -80,22 +80,22 @@ class RequestOwnershipDeviceFlowTest {
         assertEquals(SeedData.currentEmployeeId, database.scheduleDao().shiftById("shift-1")!!.employeeId)
         ui.onNodeWithText("Requests").performClick()
         ui.onNodeWithText("Status: Pending").assertIsDisplayed()
-        ui.onNodeWithText(request.note).assertIsDisplayed()
+        ui.onNodeWithText(request.note).performScrollTo().assertIsDisplayed()
         screenshot("$scenario-sender-pending")
 
         switchEmployee("Maya Chen", "Sam Rivera", "emp-sam")
         ui.onNodeWithText("To respond (1)").performClick()
         ui.onNodeWithText("Status: Pending").assertIsDisplayed()
-        ui.onNodeWithText(request.note).assertIsDisplayed()
+        ui.onNodeWithText(request.note).performScrollTo().assertIsDisplayed()
         screenshot("$scenario-recipient-pending")
         val action = if (accept) "Accept" else "Decline"
         val title = if (accept) "Accept this shift?" else "Decline this request?"
-        ui.onNodeWithText(action).performClick()
+        ui.onNodeWithText(action).performScrollTo().performClick()
         ui.onNodeWithText(title).assertIsDisplayed()
         ui.onNodeWithText("Go back").performClick()
         assertEquals(TradeRequestStatus.Pending, database.scheduleDao().requestById(request.id)!!.status)
         assertEquals(SeedData.currentEmployeeId, database.scheduleDao().shiftById("shift-1")!!.employeeId)
-        ui.onNodeWithText(action).performClick()
+        ui.onNodeWithText(action).performScrollTo().performClick()
         ui.onNodeWithText(if (accept) "Accept shift" else "Decline request").performClick()
         val expected = if (accept) TradeRequestStatus.Accepted else TradeRequestStatus.Rejected
         await { !viewModel.state.value.isBusy && viewModel.state.value.requestHistory.singleOrNull()?.request?.status == expected }
@@ -116,7 +116,7 @@ class RequestOwnershipDeviceFlowTest {
         else ui.onNodeWithContentDescription("Shift shift-1").assertIsDisplayed()
         ui.onNodeWithText("Requests").performClick()
         ui.onNodeWithText("Status: ${expected.name}").assertIsDisplayed()
-        ui.onNodeWithText(request.note).assertIsDisplayed()
+        ui.onNodeWithText(request.note).performScrollTo().assertIsDisplayed()
         screenshot("$scenario-sender-resolved")
     }
 
@@ -133,7 +133,7 @@ class RequestOwnershipDeviceFlowTest {
 
     private fun screenshot(name: String) {
         val bitmap = checkNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
-        val directory = File(context.getExternalFilesDir(null), "ui-evidence").apply { mkdirs() }
+        val directory = File(checkNotNull(context.getExternalFilesDir(null)), "ui-evidence").apply { mkdirs() }
         File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
     }
