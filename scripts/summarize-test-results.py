@@ -30,7 +30,16 @@ for directory in args.directories:
             counts['passed'] = counts['tests'] - counts['failures'] - counts['errors'] - counts['skipped']
             if counts['passed'] < 0:
                 raise ValueError(f'Inconsistent JUnit cases: {file}')
-            print('SUITE ' + json.dumps(dict(name=suite.get('name'), **counts)), flush=True)
+            classes = {}
+            for case in cases:
+                name = case.get('classname') or suite.get('name') or 'unnamed'
+                group = classes.setdefault(name, dict(tests=0, passed=0, failures=0, errors=0, skipped=0))
+                group['tests'] += 1
+                outcome = next((key for key, tag in [('failures', 'failure'), ('errors', 'error'), ('skipped', 'skipped')]
+                    if case.find(tag) is not None), 'passed')
+                group[outcome] += 1
+            for name, group in sorted(classes.items()):
+                print('SUITE ' + json.dumps(dict(name=name, **group)), flush=True)
             for key, value in counts.items():
                 totals[key] += value
     print('SUMMARY ' + json.dumps(dict(directory=str(directory), files=len(files), **totals)), flush=True)

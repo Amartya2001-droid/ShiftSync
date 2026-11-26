@@ -1,6 +1,9 @@
 package com.shiftsync.app.presentation.requests
 
+import android.content.ContentValues
 import android.graphics.Bitmap
+import android.provider.MediaStore
+import androidx.test.filters.SdkSuppress
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.lifecycle.viewModelScope
@@ -16,7 +19,6 @@ import com.shiftsync.app.domain.usecase.*
 import com.shiftsync.app.presentation.MainViewModel
 import com.shiftsync.app.presentation.ShiftSyncApp
 import com.shiftsync.app.ui.theme.ShiftSyncTheme
-import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.cancel
@@ -28,6 +30,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /** Full app UI on an Android device, using the production repository with an isolated Room DB. */
+@SdkSuppress(minSdkVersion = 29)
 class RequestOwnershipDeviceFlowTest {
     @get:Rule val ui = createComposeRule()
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -133,8 +136,16 @@ class RequestOwnershipDeviceFlowTest {
 
     private fun screenshot(name: String) {
         val bitmap = checkNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
-        val directory = File(checkNotNull(context.getExternalFilesDir(null)), "ui-evidence").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        // Shared MediaStore files survive Gradle uninstalling the app after instrumentation.
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "$name.png")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/shiftsync-ui-evidence")
+        }
+        val uri = checkNotNull(context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values))
+        checkNotNull(context.contentResolver.openOutputStream(uri)).use {
+            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+        }
         bitmap.recycle()
     }
 }

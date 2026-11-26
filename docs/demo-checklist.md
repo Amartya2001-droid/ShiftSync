@@ -69,3 +69,10 @@ Use this checklist when walking a reviewer through the project.
 - Repeat with Decline: Go back must preserve Pending; Decline request must retain Maya’s shift and mark Rejected.
 - Withdraw the offer from another participant view while a response prompt is open: the stale prompt must disappear. Changing demo employee must also dismiss it.
 - Device dialog rendering/taps remain unverified; JVM tests exercise the ViewModel confirmation flow.
+
+## Automated Emulator Walkthrough
+
+- `RequestOwnershipDeviceFlowTest` uses the full Compose app UI, production ViewModel/use cases, and a real isolated Room database in a test host activity.
+- It creates a targeted offer through the dialog, enters a reason and recipient, switches demo employee, verifies request history, dismisses and reopens response confirmation, confirms Accept/Decline, and checks both histories and roster ownership.
+- CI requires actual JUnit results with no failed/skipped tests. Shared MediaStore screenshots survive test-app uninstall; missing walkthrough images fail evidence collection.
+- This is API 35 emulator evidence, not a physical-device, production MainActivity bootstrap, process-death, or release-distribution verification.

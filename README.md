@@ -55,7 +55,7 @@ Included tests:
 - `RequestShiftSwapUseCaseTest`: smart-note path and open-board posting.
 - `CalculateWeeklyScheduleMetricsUseCaseTest`: weekly hours, dinner shift count, and estimated earnings.
 - `SwapRequestDialogTest`: device instrumentation with controlled reason/recipient state and assertions on the submitted input.
-- `RequestOwnershipDeviceFlowTest`: full Compose app UI with an isolated real Room database; sender posts a targeted request, recipient reviews history and confirms Accept/Decline, then both histories and roster ownership are checked. These tests do not launch the production MainActivity or verify process restart.
+- `RequestOwnershipDeviceFlowTest`: full Compose app UI with an isolated real Room database; sender posts a targeted request, recipient reviews history and confirms Accept/Decline, then both histories and roster ownership are checked. These tests require API 29+ for MediaStore screenshot retention; CI uses API 35. They do not launch the production MainActivity or verify process restart.
 - `PersistentScheduleRepositoryTest`: real file-backed Room database under Robolectric; reopen durability, seeding, transaction rollback, posted-shift transfers and request resolution, stale ownership, rejected claims, competing claims, concurrent weekly limits, rest checks, reactive queries, and stored wage rates.
 - `RequestResponseConfirmationTest`: no-write prompt/dismissal, confirmed accept/decline, duplicate confirmation, stale withdrawal, and demo employee changes.
 - `FilterRequestHistoryUseCaseTest`: participant isolation, incoming/sent/resolved views, counts, empty history, and accepted/declined/cancelled transitions; Room tests also check filtered history after reopening the database.
@@ -69,10 +69,13 @@ Run from the project root with JDK 17, Gradle 8.9, and Android SDK 35 installed 
 
 ```bash
 bash scripts/validate-project.sh
-gradle assembleDebug testDebugUnitTest testReleaseUnitTest assembleDebugAndroidTest
+gradle assembleDebug testDebugUnitTest assembleDebugAndroidTest
+gradle testReleaseUnitTest
 # Requires a connected Android device or emulator:
 gradle connectedDebugAndroidTest
 ```
+
+Use separate Gradle invocations for the two variants: their current Room schema export path is shared, so cold parallel variant builds can race.
 
 CI builds the debug APK, runs all JVM tests in debug and release, and compiles instrumentation tests. A separate API 35 x86_64 emulator job executes device instrumentation, reports exact JUnit counts, and retains XML/HTML, logs, device configuration, and UI walkthrough screenshots. Missing results, failures, or skips fail the verification step. Project validation alone checks structure and documentation; it does not execute Kotlin tests. `CoverageInsightFlowTest` checks seeded repository → use cases → ViewModel state after claiming and posting open shifts. Local instrumentation execution requires a connected device/emulator. Hosted emulator execution and its current results must be checked in Actions; compilation alone is not a device pass.
 
