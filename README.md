@@ -54,7 +54,8 @@ Included tests:
 - `ValidateTradeEligibilityUseCaseTest`: overlapping shifts, max-hour violations, and valid claims.
 - `RequestShiftSwapUseCaseTest`: smart-note path and open-board posting.
 - `CalculateWeeklyScheduleMetricsUseCaseTest`: weekly hours, dinner shift count, and estimated earnings.
-- `SwapRequestDialogTest`: Compose dialog opens, accepts input, and submits the smart-note action (device instrumentation).
+- `SwapRequestDialogTest`: device instrumentation with controlled reason/recipient state and assertions on the submitted input.
+- `RequestOwnershipDeviceFlowTest`: full Compose app UI with an isolated real Room database; sender posts a targeted request, recipient reviews history and confirms Accept/Decline, then both histories and roster ownership are checked. These tests require API 29+ for MediaStore screenshot retention; CI uses API 35. They do not launch the production MainActivity or verify process restart.
 - `PersistentScheduleRepositoryTest`: real file-backed Room database under Robolectric; reopen durability, seeding, transaction rollback, posted-shift transfers and request resolution, stale ownership, rejected claims, competing claims, concurrent weekly limits, rest checks, reactive queries, and stored wage rates.
 - `RequestResponseConfirmationTest`: no-write prompt/dismissal, confirmed accept/decline, duplicate confirmation, stale withdrawal, and demo employee changes.
 - `FilterRequestHistoryUseCaseTest`: participant isolation, incoming/sent/resolved views, counts, empty history, and accepted/declined/cancelled transitions; Room tests also check filtered history after reopening the database.
@@ -69,11 +70,14 @@ Run from the project root with JDK 17, Gradle 8.9, and Android SDK 35 installed 
 ```bash
 bash scripts/validate-project.sh
 gradle assembleDebug testDebugUnitTest assembleDebugAndroidTest
+gradle testReleaseUnitTest
 # Requires a connected Android device or emulator:
 gradle connectedDebugAndroidTest
 ```
 
-CI builds the debug APK, runs JVM tests, and compiles instrumentation tests. Project validation alone checks structure and documentation; it does not execute Kotlin tests. `CoverageInsightFlowTest` checks seeded repository → use cases → ViewModel state after claiming and posting open shifts. Instrumentation execution requires a device and is not part of the hosted CI job.
+Use separate Gradle invocations for the two variants: their current Room schema export path is shared, so cold parallel variant builds can race.
+
+CI builds the debug APK, runs all JVM tests in debug and release, and compiles instrumentation tests. A separate API 35 x86_64 emulator job executes device instrumentation, reports exact JUnit counts, and retains XML/HTML, logs, device configuration, and UI walkthrough screenshots. Missing results, failures, or skips fail the verification step. Project validation alone checks structure and documentation; it does not execute Kotlin tests. `CoverageInsightFlowTest` checks seeded repository → use cases → ViewModel state after claiming and posting open shifts. Local instrumentation execution requires a connected device/emulator. Hosted emulator execution and its current results must be checked in Actions; compilation alone is not a device pass.
 
 ## Live status
 
@@ -83,6 +87,6 @@ Not live yet — blocked by release preparation and distribution. There is no ve
 
 `ShiftSyncApplication` owns `shiftsync.db` and the persistent repository. `MainActivity` wires it into the ViewModel; startup seeds the database on a background Room transaction before observing it. Loading failures offer Retry, and failed writes retain the swap input and show an error.
 
-To exercise ownership: as Maya, post a roster shift to the open board. It remains in Maya’s roster; Marketplace identifies the owner and disables self-claim. Use **Demo employee** to select Sam, claim the posted shift, then switch back to Maya. The shift should be removed from Maya’s roster and added to Sam’s, with updated hours and coverage gaps. Open Requests as each participant to inspect the saved status and note. For a targeted offer, send to Sam, switch to Sam, and choose Accept or Decline in Requests; confirm both histories and rosters update. Force-stop and relaunch to check durability (the demo employee selection resets to Maya). Conflicting or stale claims show an error and keep the current owner. Employee switching and repeated claim taps are disabled during a write. Rotation uses the same application database and ViewModel. UI taps and real-device lifecycle behavior still require device verification; Robolectric database tests are JVM tests, not a device test pass.
+To exercise ownership: as Maya, post a roster shift to the open board. It remains in Maya’s roster; Marketplace identifies the owner and disables self-claim. Use **Demo employee** to select Sam, claim the posted shift, then switch back to Maya. The shift should be removed from Maya’s roster and added to Sam’s, with updated hours and coverage gaps. Open Requests as each participant to inspect the saved status and note. For a targeted offer, send to Sam, switch to Sam, and choose Accept or Decline in Requests; confirm both histories and rosters update. Force-stop and relaunch to check durability (the demo employee selection resets to Maya). Conflicting or stale claims show an error and keep the current owner. Employee switching and repeated claim taps are disabled during a write. Rotation uses the same application database and ViewModel. The CI emulator exercises request/dialog taps in an isolated Room-backed Compose test host. Physical devices, production MainActivity bootstrap, and lifecycle/process-death behavior remain unverified; Robolectric database tests are JVM tests, not device tests.
 
 For a reviewer-facing walkthrough, use [docs/demo-checklist.md](docs/demo-checklist.md).

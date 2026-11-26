@@ -60,7 +60,7 @@ Use this checklist when walking a reviewer through the project.
 - Accept or decline an offer: it should leave To respond and remain in Resolved with its note/status. Sender withdrawal should likewise move it to Resolved as Cancelled.
 - Sent should include the selected employee’s own pending and resolved offers; All keeps both directions in newest-first order.
 - Counts should reflect the selected employee’s saved history. Change demo employee and confirm the view resets to All.
-- On a narrow device, scroll the filter controls horizontally. Empty views should explain what belongs there. Device rendering/taps remain unverified until a device/emulator walkthrough is run.
+- On a narrow device, scroll the filter controls horizontally. Empty views should explain what belongs there. CI covers the API 35 emulator interactions described below; physical devices and the complete large-text/screen-size matrix remain unverified.
 
 ## Confirm a Targeted Response
 
@@ -68,4 +68,11 @@ Use this checklist when walking a reviewer through the project.
 - Reopen and confirm Accept shift: verify one transfer and Accepted status in both histories.
 - Repeat with Decline: Go back must preserve Pending; Decline request must retain Maya’s shift and mark Rejected.
 - Withdraw the offer from another participant view while a response prompt is open: the stale prompt must disappear. Changing demo employee must also dismiss it.
-- Device dialog rendering/taps remain unverified; JVM tests exercise the ViewModel confirmation flow.
+- API 35 emulator instrumentation exercises Accept/Decline dialog rendering/taps in an isolated test host; physical-device and lifecycle behavior remain unverified.
+
+## Automated Emulator Walkthrough
+
+- `RequestOwnershipDeviceFlowTest` uses the full Compose app UI, production ViewModel/use cases, and a real isolated Room database in a test host activity.
+- It creates a targeted offer through the dialog, enters a reason and recipient, switches demo employee, verifies request history, dismisses and reopens response confirmation, confirms Accept/Decline, and checks both histories and roster ownership.
+- CI requires actual JUnit results with no failed/skipped tests. Shared MediaStore screenshots survive test-app uninstall; missing walkthrough images fail evidence collection.
+- This is API 35 emulator evidence, not a physical-device, production MainActivity bootstrap, process-death, or release-distribution verification.
