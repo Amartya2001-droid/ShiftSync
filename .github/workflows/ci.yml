@@ -35,7 +35,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - run: gradle --no-daemon assembleDebug testDebugUnitTest testReleaseUnitTest assembleDebugAndroidTest
+      # Serial invocations avoid concurrent KSP exports to the shared Room schema file.
+      - run: |
+          gradle --no-daemon assembleDebug testDebugUnitTest assembleDebugAndroidTest
+          gradle --no-daemon testReleaseUnitTest
       - name: Report exact JVM counts
         if: always()
         run: python3 scripts/summarize-test-results.py app/build/test-results/testDebugUnitTest app/build/test-results/testReleaseUnitTest
