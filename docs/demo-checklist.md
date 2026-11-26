@@ -60,7 +60,7 @@ Use this checklist when walking a reviewer through the project.
 - Accept or decline an offer: it should leave To respond and remain in Resolved with its note/status. Sender withdrawal should likewise move it to Resolved as Cancelled.
 - Sent should include the selected employee’s own pending and resolved offers; All keeps both directions in newest-first order.
 - Counts should reflect the selected employee’s saved history. Change demo employee and confirm the view resets to All.
-- On a narrow device, scroll the filter controls horizontally. Empty views should explain what belongs there. Device rendering/taps remain unverified until a device/emulator walkthrough is run.
+- On a narrow device, scroll the filter controls horizontally. Empty views should explain what belongs there. CI covers the API 35 emulator interactions described below; physical devices and the complete large-text/screen-size matrix remain unverified.
 
 ## Confirm a Targeted Response
 
@@ -68,7 +68,7 @@ Use this checklist when walking a reviewer through the project.
 - Reopen and confirm Accept shift: verify one transfer and Accepted status in both histories.
 - Repeat with Decline: Go back must preserve Pending; Decline request must retain Maya’s shift and mark Rejected.
 - Withdraw the offer from another participant view while a response prompt is open: the stale prompt must disappear. Changing demo employee must also dismiss it.
-- Device dialog rendering/taps remain unverified; JVM tests exercise the ViewModel confirmation flow.
+- API 35 emulator instrumentation exercises Accept/Decline dialog rendering/taps in an isolated test host; physical-device and lifecycle behavior remain unverified.
 
 ## Automated Emulator Walkthrough
 
